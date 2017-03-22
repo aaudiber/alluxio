@@ -284,10 +284,15 @@ public final class DefaultAlluxioWorker implements AlluxioWorkerService {
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }
+    long timeoutMs =
+        Configuration.getLong(PropertyKey.SECURITY_AUTHENTICATION_SOCKET_TIMEOUT_MS);
     TThreadPoolServer.Args args = new TThreadPoolServer.Args(mThriftServerSocket)
-        .minWorkerThreads(minWorkerThreads).maxWorkerThreads(maxWorkerThreads).processor(processor)
-        .transportFactory(tTransportFactory)
-        .protocolFactory(new TBinaryProtocol.Factory(true, true));
+        .executorService(new TimeoutThreadPoolExecutor(timeoutMs))
+        .minWorkerThreads(minWorkerThreads)
+        .maxWorkerThreads(maxWorkerThreads)
+        .processor(processor)
+        .protocolFactory(new TBinaryProtocol.Factory(true, true))
+        .transportFactory(tTransportFactory);
     if (Configuration.getBoolean(PropertyKey.TEST_MODE)) {
       args.stopTimeoutVal = 0;
     } else {

@@ -112,7 +112,11 @@ public final class BlockLockManager {
       }
       lock = blockLock.writeLock();
     }
-    lock.lock();
+    try {
+      lock.lockInterruptibly();
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
+    }
     try {
       long lockId = LOCK_ID_GEN.getAndIncrement();
       synchronized (mSharedMapsLock) {
