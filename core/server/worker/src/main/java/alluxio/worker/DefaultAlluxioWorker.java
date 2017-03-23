@@ -20,6 +20,7 @@ import alluxio.metrics.MetricsSystem;
 import alluxio.metrics.sink.MetricsServlet;
 import alluxio.security.authentication.TransportProvider;
 import alluxio.util.CommonUtils;
+import alluxio.util.executor.TimeoutThreadPoolExecutor;
 import alluxio.util.network.NetworkAddressUtils;
 import alluxio.util.network.NetworkAddressUtils.ServiceType;
 import alluxio.web.WebServer;
@@ -287,7 +288,7 @@ public final class DefaultAlluxioWorker implements AlluxioWorkerService {
     long timeoutMs =
         Configuration.getLong(PropertyKey.SECURITY_AUTHENTICATION_SOCKET_TIMEOUT_MS);
     TThreadPoolServer.Args args = new TThreadPoolServer.Args(mThriftServerSocket)
-        .executorService(new TimeoutThreadPoolExecutor(timeoutMs))
+        .executorService(new TimeoutThreadPoolExecutor(timeoutMs, minWorkerThreads, maxWorkerThreads))
         .minWorkerThreads(minWorkerThreads)
         .maxWorkerThreads(maxWorkerThreads)
         .processor(processor)
