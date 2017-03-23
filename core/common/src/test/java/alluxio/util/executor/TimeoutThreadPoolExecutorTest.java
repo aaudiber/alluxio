@@ -45,7 +45,7 @@ public final class TimeoutThreadPoolExecutorTest {
   public void doNotInterruptQuickThreads() throws Exception {
     long timeoutMs = 50;
     long maxCheckInterval = 10;
-    int numThreads = 50;
+    int numThreads = 5;
     TimeoutThreadPoolExecutor executor =
         new TimeoutThreadPoolExecutor(timeoutMs, maxCheckInterval, numThreads, numThreads);
     for (int i = 0; i < 1000; i++) {
@@ -62,8 +62,9 @@ public final class TimeoutThreadPoolExecutorTest {
     int numThreads = 100;
     TimeoutThreadPoolExecutor executor =
         new TimeoutThreadPoolExecutor(timeoutMs, maxCheckInterval, numThreads, numThreads);
-    // Submit 25 batches of 20 threads which will hang. Sleep for half of the thread timeout so that
-    // the thread pool has a chance to kill timed-out threads before running out of its 100 threads.
+    // Submit 25 batches of 20 threads which will hang unless interrupted. Sleep for half of the
+    // thread timeout so that the executor has a chance to kill timed-out threads before running out
+    // of its 100 threads.
     for (int i = 0; i < 25; i++) {
       for (int j = 0; j < 20; j++) {
         executor.submit(new InterruptionChecker(Integer.MAX_VALUE));
