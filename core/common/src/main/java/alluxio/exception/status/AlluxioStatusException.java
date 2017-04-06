@@ -22,8 +22,28 @@ public class AlluxioStatusException extends RuntimeException {
 
   /**
    * @param status the status code for this exception
+   * @param message the exception message
    */
-  public AlluxioStatusException(ExceptionStatus status) {
+  public AlluxioStatusException(ExceptionStatus status, String message) {
+    super(message);
+    mStatus = status;
+  }
+
+  /**
+   * @param status the status code for this exception
+   * @param cause the cause of the exception
+   */
+  public AlluxioStatusException(ExceptionStatus status, Throwable cause) {
+    this(status, cause.getMessage(), cause);
+  }
+
+  /**
+   * @param status the status code for this exception
+   * @param message the exception message
+   * @param cause the cause of the exception
+   */
+  public AlluxioStatusException(ExceptionStatus status, String message, Throwable cause) {
+    super(message, cause);
     mStatus = status;
   }
 
