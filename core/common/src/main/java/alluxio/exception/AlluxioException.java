@@ -11,20 +11,13 @@
 
 package alluxio.exception;
 
-import alluxio.exception.status.AlluxioStatusException;
-
 import javax.annotation.concurrent.ThreadSafe;
 
 /**
- * Legacy exception type thrown by the client API. All exceptions thrown from Alluxio servers will
- * extend this type. In 2.0 this class will be removed and {@link AlluxioStatusException} will
- * extend RuntimeException directly.
- *
- * @deprecated use {@link AlluxioStatusException} instead
+ * All exceptions thrown from the Alluxio native client extend this type.
  */
 @ThreadSafe
-@Deprecated
-public class AlluxioException extends RuntimeException {
+public class AlluxioException extends Exception {
   private static final long serialVersionUID = 2243833925609642384L;
 
   /**

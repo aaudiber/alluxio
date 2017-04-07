@@ -21,8 +21,8 @@ import alluxio.client.resource.LockBlockResource;
 import alluxio.exception.AlluxioException;
 import alluxio.exception.ExceptionMessage;
 import alluxio.exception.UfsBlockAccessTokenUnavailableException;
-import alluxio.exception.WorkerOutOfSpaceException;
 import alluxio.exception.status.AlluxioStatusException;
+import alluxio.exception.status.ResourceExhaustedException;
 import alluxio.metrics.MetricsSystem;
 import alluxio.retry.CountingRetry;
 import alluxio.retry.ExponentialBackoffRetry;
@@ -297,33 +297,27 @@ public final class RetryHandlingBlockWorkerClient
               return client.requestBlockLocation(getSessionId(), blockId, initialBytes, writeTier);
             }
           });
-    } catch (WorkerOutOfSpaceException e) {
+    } catch (ResourceExhaustedException e) {
       throw new IOException(ExceptionMessage.CANNOT_REQUEST_SPACE
           .getMessageWithUrl(RuntimeConstants.ALLUXIO_DEBUG_DOCS_URL, mRpcAddress, blockId));
-    } catch (AlluxioException e) {
-      throw new IOException(e);
     }
   }
 
   @Override
   public boolean requestSpace(final long blockId, final long requestBytes) throws IOException {
-    try {
-      boolean success = retryRPC(
-          new RpcCallable<Boolean, BlockWorkerClientService.Client>() {
-            @Override
-            public Boolean call(BlockWorkerClientService.Client client)
-                throws AlluxioTException, TException {
-              return client.requestSpace(getSessionId(), blockId, requestBytes);
-            }
-          });
-      if (!success) {
-        throw new IOException(ExceptionMessage.CANNOT_REQUEST_SPACE
-            .getMessageWithUrl(RuntimeConstants.ALLUXIO_DEBUG_DOCS_URL, mRpcAddress, blockId));
-      }
-      return true;
-    } catch (AlluxioException e) {
-      throw new IOException(e);
+    boolean success = retryRPC(
+        new RpcCallable<Boolean, BlockWorkerClientService.Client>() {
+          @Override
+          public Boolean call(BlockWorkerClientService.Client client)
+              throws AlluxioTException, TException {
+            return client.requestSpace(getSessionId(), blockId, requestBytes);
+          }
+        });
+    if (!success) {
+      throw new IOException(ExceptionMessage.CANNOT_REQUEST_SPACE
+          .getMessageWithUrl(RuntimeConstants.ALLUXIO_DEBUG_DOCS_URL, mRpcAddress, blockId));
     }
+    return true;
   }
 
   @Override

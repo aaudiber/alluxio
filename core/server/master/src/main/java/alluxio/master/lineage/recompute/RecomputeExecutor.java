@@ -11,7 +11,9 @@
 
 package alluxio.master.lineage.recompute;
 
+import alluxio.exception.AccessControlException;
 import alluxio.exception.FileDoesNotExistException;
+import alluxio.exception.InvalidPathException;
 import alluxio.exception.status.AlluxioStatusException;
 import alluxio.heartbeat.HeartbeatExecutor;
 import alluxio.master.file.FileSystemMaster;
@@ -106,7 +108,13 @@ public final class RecomputeExecutor implements HeartbeatExecutor {
             try {
               mFileSystemMaster.resetFile(fileId);
             } catch (AlluxioStatusException e) {
-              LOG.error("Failed to reset file {}", fileId, e);
+              LOG.error("the lost file {} can not be freed", fileId, e);
+            } catch (FileDoesNotExistException e) {
+              LOG.error("the lost file {} does not exist", fileId, e);
+            } catch (InvalidPathException e) {
+              LOG.error("the lost file {} is invalid", fileId, e);
+            } catch (AccessControlException e) {
+              LOG.error("the lost file {} cannot be accessed", fileId, e);
             }
           }
         } catch (FileDoesNotExistException e) {

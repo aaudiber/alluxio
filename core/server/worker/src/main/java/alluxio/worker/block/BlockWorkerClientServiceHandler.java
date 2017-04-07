@@ -14,7 +14,7 @@ package alluxio.worker.block;
 import alluxio.Constants;
 import alluxio.RpcUtils;
 import alluxio.RpcUtils.RpcCallable;
-import alluxio.RpcUtils.RpcCallableThrowsIOException;
+import alluxio.RpcUtils.RpcCallable;
 import alluxio.Sessions;
 import alluxio.StorageTierAssoc;
 import alluxio.WorkerStorageTierAssoc;
@@ -101,7 +101,7 @@ public final class BlockWorkerClientServiceHandler implements BlockWorkerClientS
   @Override
   public void cacheBlock(final long sessionId, final long blockId)
       throws AlluxioTException, ThriftIOException {
-    RpcUtils.callAndLog(LOG, new RpcCallableThrowsIOException<Void>() {
+    RpcUtils.callAndLog(LOG, new RpcCallable<Void>() {
       @Override
       public Void call() throws AlluxioException, IOException {
         mWorker.commitBlock(sessionId, blockId);
@@ -127,7 +127,7 @@ public final class BlockWorkerClientServiceHandler implements BlockWorkerClientS
   @Override
   public void cancelBlock(final long sessionId, final long blockId)
       throws AlluxioTException, ThriftIOException {
-    RpcUtils.callAndLog(LOG, new RpcCallableThrowsIOException<Void>() {
+    RpcUtils.callAndLog(LOG, new RpcCallable<Void>() {
       @Override
       public Void call() throws AlluxioException, IOException {
         mWorker.abortBlock(sessionId, blockId);
@@ -199,7 +199,7 @@ public final class BlockWorkerClientServiceHandler implements BlockWorkerClientS
   // TODO(calvin): This may be better as void.
   @Override
   public boolean promoteBlock(final long blockId) throws AlluxioTException, ThriftIOException {
-    return RpcUtils.callAndLog(LOG, new RpcCallableThrowsIOException<Boolean>() {
+    return RpcUtils.callAndLog(LOG, new RpcCallable<Boolean>() {
       @Override
       public Boolean call() throws AlluxioException, IOException {
         // TODO(calvin): Make the top level configurable.
@@ -224,7 +224,7 @@ public final class BlockWorkerClientServiceHandler implements BlockWorkerClientS
    */
   @Override
   public void removeBlock(final long blockId) throws AlluxioTException, ThriftIOException {
-    RpcUtils.callAndLog(LOG, new RpcCallableThrowsIOException<Void>() {
+    RpcUtils.callAndLog(LOG, new RpcCallable<Void>() {
       @Override
       public Void call() throws AlluxioException, IOException {
         mWorker.removeBlock(Sessions.MIGRATE_DATA_SESSION_ID, blockId);
@@ -256,7 +256,7 @@ public final class BlockWorkerClientServiceHandler implements BlockWorkerClientS
   @Override
   public String requestBlockLocation(final long sessionId, final long blockId,
       final long initialBytes, final int writeTier) throws AlluxioTException, ThriftIOException {
-    return RpcUtils.callAndLog(LOG, new RpcCallableThrowsIOException<String>() {
+    return RpcUtils.callAndLog(LOG, new RpcCallable<String>() {
       @Override
       public String call() throws AlluxioException, IOException {
         return mWorker.createBlock(sessionId, blockId, mStorageTierAssoc.getAlias(writeTier),
@@ -328,7 +328,7 @@ public final class BlockWorkerClientServiceHandler implements BlockWorkerClientS
   @Override
   public boolean unlockBlock(final long blockId, final long sessionId)
       throws AlluxioTException, ThriftIOException {
-    return RpcUtils.callAndLog(LOG, new RpcCallableThrowsIOException<Boolean>() {
+    return RpcUtils.callAndLog(LOG, new RpcCallable<Boolean>() {
       @Override
       public Boolean call() throws AlluxioException, IOException {
         if (!mWorker.unlockBlock(sessionId, blockId)) {

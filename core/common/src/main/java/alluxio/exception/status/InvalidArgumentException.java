@@ -30,7 +30,7 @@ public class InvalidArgumentException extends AlluxioStatusException {
   /**
    * @param cause the cause of the exception
    */
-  public InvalidArgumentException(ExceptionStatus status, Throwable cause) {
+  public InvalidArgumentException(Throwable cause) {
     this(cause.getMessage(), cause);
   }
 

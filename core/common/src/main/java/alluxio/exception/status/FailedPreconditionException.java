@@ -46,7 +46,7 @@ public class FailedPreconditionException extends AlluxioStatusException {
   /**
    * @param cause the cause of the exception
    */
-  public FailedPreconditionException(ExceptionStatus status, Throwable cause) {
+  public FailedPreconditionException(Throwable cause) {
     this(cause.getMessage(), cause);
   }
 

@@ -11,14 +11,13 @@
 
 package alluxio.exception.status;
 
-import alluxio.exception.AlluxioException;
 import alluxio.thrift.AlluxioTException;
 
 /**
  * An exception thrown by Alluxio. {@link #getStatus()} can be used to determine the represented
  * class of error.
  */
-public class AlluxioStatusException extends AlluxioException {
+public class AlluxioStatusException extends RuntimeException {
   private static final long serialVersionUID = -7422144873058169662L;
 
   private final ExceptionStatus mStatus;
