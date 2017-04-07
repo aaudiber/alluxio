@@ -29,7 +29,7 @@ public class UnimplementedException extends AlluxioStatusException {
   /**
    * @param cause the cause of the exception
    */
-  public UnimplementedException(ExceptionStatus status, Throwable cause) {
+  public UnimplementedException(Throwable cause) {
     this(cause.getMessage(), cause);
   }
 

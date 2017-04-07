@@ -29,7 +29,7 @@ import alluxio.exception.FileDoesNotExistException;
 import alluxio.exception.InvalidFileSizeException;
 import alluxio.exception.InvalidPathException;
 import alluxio.exception.PreconditionMessage;
-import alluxio.exception.UnexpectedAlluxioException;
+import alluxio.exception.status.FailedPreconditionException;
 import alluxio.heartbeat.HeartbeatContext;
 import alluxio.heartbeat.HeartbeatExecutor;
 import alluxio.heartbeat.HeartbeatThread;
@@ -2103,8 +2103,7 @@ public final class FileSystemMaster extends AbstractMaster {
    * @throws UnexpectedAlluxioException if the file or directory can not be freed
    */
   public void free(AlluxioURI path, FreeOptions options)
-      throws FileDoesNotExistException, InvalidPathException, AccessControlException,
-      UnexpectedAlluxioException {
+      throws FileDoesNotExistException, InvalidPathException, AccessControlException {
     Metrics.FREE_FILE_OPS.inc();
     try (JournalContext journalContext = createJournalContext();
         LockedInodePath inodePath = mInodeTree.lockFullInodePath(path, InodeTree.LockMode.WRITE)) {
@@ -2128,13 +2127,12 @@ public final class FileSystemMaster extends AbstractMaster {
    */
   private void freeAndJournal(LockedInodePath inodePath, FreeOptions options,
       JournalContext journalContext)
-      throws FileDoesNotExistException, UnexpectedAlluxioException, AccessControlException,
-      InvalidPathException {
+          throws FileDoesNotExistException, AccessControlException, InvalidPathException {
     Inode<?> inode = inodePath.getInode();
     if (inode.isDirectory() && !options.isRecursive()
         && ((InodeDirectory) inode).getNumberOfChildren() > 0) {
       // inode is nonempty, and we don't free a nonempty directory unless recursive is true
-      throw new UnexpectedAlluxioException(
+      throw new FailedPreconditionException(
           ExceptionMessage.CANNOT_FREE_NON_EMPTY_DIR.getMessage(mInodeTree.getPath(inode)));
     }
     long opTimeMs = System.currentTimeMillis();
@@ -2150,12 +2148,12 @@ public final class FileSystemMaster extends AbstractMaster {
 
         if (freeInode.isFile()) {
           if (freeInode.getPersistenceState() != PersistenceState.PERSISTED) {
-            throw new UnexpectedAlluxioException(ExceptionMessage.CANNOT_FREE_NON_PERSISTED_FILE
+            throw new FailedPreconditionException(ExceptionMessage.CANNOT_FREE_NON_PERSISTED_FILE
                 .getMessage(mInodeTree.getPath(freeInode)));
           }
           if (freeInode.isPinned()) {
             if (!options.isForced()) {
-              throw new UnexpectedAlluxioException(ExceptionMessage.CANNOT_FREE_PINNED_FILE
+              throw new FailedPreconditionException(ExceptionMessage.CANNOT_FREE_PINNED_FILE
                   .getMessage(mInodeTree.getPath(freeInode)));
             }
             // the path to inode for getPath should already be locked.
@@ -2704,13 +2702,11 @@ public final class FileSystemMaster extends AbstractMaster {
    * @throws FileDoesNotExistException if the file does not exist
    * @throws AccessControlException if permission checking fails
    * @throws InvalidPathException if the path is invalid for the id of the file
-   * @throws UnexpectedAlluxioException if the file or directory can not be freed
    */
   // Currently used by Lineage Master
   // TODO(binfan): Add permission checking for internal APIs
   public void resetFile(long fileId)
-      throws UnexpectedAlluxioException, FileDoesNotExistException, InvalidPathException,
-      AccessControlException {
+      throws FileDoesNotExistException, InvalidPathException, AccessControlException {
     // TODO(yupeng) check the file is not persisted
     try (JournalContext journalContext = createJournalContext();
         LockedInodePath inodePath = mInodeTree

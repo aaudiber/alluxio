@@ -12,7 +12,8 @@
 package alluxio;
 
 import alluxio.exception.AlluxioException;
-import alluxio.exception.UnexpectedAlluxioException;
+import alluxio.exception.status.AlluxioStatusException;
+import alluxio.exception.status.UnknownException;
 import alluxio.thrift.AlluxioTException;
 import alluxio.thrift.ThriftIOException;
 
@@ -36,12 +37,12 @@ public final class RpcUtils {
   public static <T> T call(Logger logger, RpcCallable<T> callable) throws AlluxioTException {
     try {
       return callable.call();
-    } catch (AlluxioException e) {
+    } catch (AlluxioStatusException e) {
       logger.debug("{}, Error={}", callable, e.getMessage());
       throw e.toThrift();
     } catch (Exception e) {
       logger.error("{}", callable, e);
-      throw new UnexpectedAlluxioException(e).toThrift();
+      throw new UnknownException(e).toThrift();
     }
   }
 
@@ -59,7 +60,7 @@ public final class RpcUtils {
       throws AlluxioTException, ThriftIOException {
     try {
       return callable.call();
-    } catch (AlluxioException e) {
+    } catch (AlluxioStatusException e) {
       logger.debug("{}, Error={}", callable, e.getMessage());
       throw e.toThrift();
     } catch (IOException e) {
@@ -68,7 +69,7 @@ public final class RpcUtils {
       throw new ThriftIOException(e.getMessage());
     } catch (Exception e) {
       logger.error("{}", callable, e);
-      throw new UnexpectedAlluxioException(e).toThrift();
+      throw new UnknownException(e).toThrift();
     }
   }
 

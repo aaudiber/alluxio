@@ -28,7 +28,7 @@ public class DataLossException extends AlluxioStatusException {
   /**
    * @param cause the cause of the exception
    */
-  public DataLossException(ExceptionStatus status, Throwable cause) {
+  public DataLossException(Throwable cause) {
     this(cause.getMessage(), cause);
   }
 

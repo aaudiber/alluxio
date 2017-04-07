@@ -28,7 +28,7 @@ public class CanceledException extends AlluxioStatusException {
   /**
    * @param cause the cause of the exception
    */
-  public CanceledException(ExceptionStatus status, Throwable cause) {
+  public CanceledException(Throwable cause) {
     this(cause.getMessage(), cause);
   }
 

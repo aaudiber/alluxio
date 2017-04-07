@@ -12,22 +12,22 @@ import java.util.HashMap;
 import org.apache.thrift.TEnum;
 
 public enum TExceptionStatus implements org.apache.thrift.TEnum {
-  Canceled(1),
-  Unknown(2),
-  InvalidArgument(3),
-  DeadlineExceeded(4),
-  NotFound(5),
-  AlreadyExists(6),
-  PermissionDenied(7),
-  Unauthenticated(16),
-  ResourceExhausted(8),
-  FailedPrecondition(9),
-  Aborted(10),
-  OutOfRange(11),
-  Unimplemented(12),
-  Internal(13),
-  Unavailable(14),
-  DataLoss(15);
+  CANCELED(1),
+  UNKNOWN(2),
+  INVALID_ARGUMENT(3),
+  DEADLINE_EXCEEDED(4),
+  NOT_FOUND(5),
+  ALREADY_EXISTS(6),
+  PERMISSION_DENIED(7),
+  UNAUTHENTICATED(16),
+  RESOURCE_EXHAUSTED(8),
+  FAILED_PRECONDITION(9),
+  ABORTED(10),
+  OUT_OF_RANGE(11),
+  UNIMPLEMENTED(12),
+  INTERNAL(13),
+  UNAVAILABLE(14),
+  DATA_LOSS(15);
 
   private final int value;
 
@@ -49,37 +49,37 @@ public enum TExceptionStatus implements org.apache.thrift.TEnum {
   public static TExceptionStatus findByValue(int value) { 
     switch (value) {
       case 1:
-        return Canceled;
+        return CANCELED;
       case 2:
-        return Unknown;
+        return UNKNOWN;
       case 3:
-        return InvalidArgument;
+        return INVALID_ARGUMENT;
       case 4:
-        return DeadlineExceeded;
+        return DEADLINE_EXCEEDED;
       case 5:
-        return NotFound;
+        return NOT_FOUND;
       case 6:
-        return AlreadyExists;
+        return ALREADY_EXISTS;
       case 7:
-        return PermissionDenied;
+        return PERMISSION_DENIED;
       case 16:
-        return Unauthenticated;
+        return UNAUTHENTICATED;
       case 8:
-        return ResourceExhausted;
+        return RESOURCE_EXHAUSTED;
       case 9:
-        return FailedPrecondition;
+        return FAILED_PRECONDITION;
       case 10:
-        return Aborted;
+        return ABORTED;
       case 11:
-        return OutOfRange;
+        return OUT_OF_RANGE;
       case 12:
-        return Unimplemented;
+        return UNIMPLEMENTED;
       case 13:
-        return Internal;
+        return INTERNAL;
       case 14:
-        return Unavailable;
+        return UNAVAILABLE;
       case 15:
-        return DataLoss;
+        return DATA_LOSS;
       default:
         return null;
     }

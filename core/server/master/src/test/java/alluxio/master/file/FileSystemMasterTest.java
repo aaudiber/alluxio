@@ -24,7 +24,7 @@ import alluxio.exception.ExceptionMessage;
 import alluxio.exception.FileAlreadyExistsException;
 import alluxio.exception.FileDoesNotExistException;
 import alluxio.exception.InvalidPathException;
-import alluxio.exception.UnexpectedAlluxioException;
+import alluxio.exception.status.FailedPreconditionException;
 import alluxio.heartbeat.HeartbeatContext;
 import alluxio.heartbeat.HeartbeatScheduler;
 import alluxio.heartbeat.ManuallyScheduleHeartbeat;
@@ -1214,7 +1214,7 @@ public final class FileSystemMasterTest {
   @Test
   public void freeNonPersistedFile() throws Exception {
     createFileWithSingleBlock(NESTED_FILE_URI);
-    mThrown.expect(UnexpectedAlluxioException.class);
+    mThrown.expect(FailedPreconditionException.class);
     mThrown.expectMessage(ExceptionMessage.CANNOT_FREE_NON_PERSISTED_FILE
         .getMessage(NESTED_FILE_URI.getPath()));
     // cannot free a non-persisted file
@@ -1229,7 +1229,7 @@ public final class FileSystemMasterTest {
     mNestedFileOptions.setPersisted(true);
     createFileWithSingleBlock(NESTED_FILE_URI);
     mFileSystemMaster.setAttribute(NESTED_FILE_URI, SetAttributeOptions.defaults().setPinned(true));
-    mThrown.expect(UnexpectedAlluxioException.class);
+    mThrown.expect(FailedPreconditionException.class);
     mThrown.expectMessage(ExceptionMessage.CANNOT_FREE_PINNED_FILE
         .getMessage(NESTED_FILE_URI.getPath()));
     // cannot free a pinned file without "forced"
@@ -1265,7 +1265,7 @@ public final class FileSystemMasterTest {
   public void freeDirNonRecursive() throws Exception {
     mNestedFileOptions.setPersisted(true);
     createFileWithSingleBlock(NESTED_FILE_URI);
-    mThrown.expect(UnexpectedAlluxioException.class);
+    mThrown.expect(FailedPreconditionException.class);
     mThrown.expectMessage(ExceptionMessage.CANNOT_FREE_NON_EMPTY_DIR.getMessage(NESTED_URI));
     // cannot free directory with recursive argument to false
     mFileSystemMaster.free(NESTED_FILE_URI.getParent(), FreeOptions.defaults().setRecursive(false));
@@ -1298,7 +1298,7 @@ public final class FileSystemMasterTest {
   @Test
   public void freeDirWithNonPersistedFile() throws Exception {
     createFileWithSingleBlock(NESTED_FILE_URI);
-    mThrown.expect(UnexpectedAlluxioException.class);
+    mThrown.expect(FailedPreconditionException.class);
     mThrown.expectMessage(ExceptionMessage.CANNOT_FREE_NON_PERSISTED_FILE
         .getMessage(NESTED_FILE_URI.getPath()));
     // cannot free the parent dir of a non-persisted file
@@ -1315,7 +1315,7 @@ public final class FileSystemMasterTest {
     mNestedFileOptions.setPersisted(true);
     createFileWithSingleBlock(NESTED_FILE_URI);
     mFileSystemMaster.setAttribute(NESTED_FILE_URI, SetAttributeOptions.defaults().setPinned(true));
-    mThrown.expect(UnexpectedAlluxioException.class);
+    mThrown.expect(FailedPreconditionException.class);
     mThrown.expectMessage(ExceptionMessage.CANNOT_FREE_PINNED_FILE
         .getMessage(NESTED_FILE_URI.getPath()));
     // cannot free the parent dir of a pinned file without "forced"

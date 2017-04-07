@@ -29,7 +29,7 @@ public class UnauthenticatedException extends AlluxioStatusException {
   /**
    * @param cause the cause of the exception
    */
-  public UnauthenticatedException(ExceptionStatus status, Throwable cause) {
+  public UnauthenticatedException(Throwable cause) {
     this(cause.getMessage(), cause);
   }
 

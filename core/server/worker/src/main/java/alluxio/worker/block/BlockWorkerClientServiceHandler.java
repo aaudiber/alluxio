@@ -20,8 +20,8 @@ import alluxio.StorageTierAssoc;
 import alluxio.WorkerStorageTierAssoc;
 import alluxio.exception.AlluxioException;
 import alluxio.exception.BlockDoesNotExistException;
-import alluxio.exception.UnexpectedAlluxioException;
 import alluxio.exception.WorkerOutOfSpaceException;
+import alluxio.exception.status.UnavailableException;
 import alluxio.thrift.AlluxioTException;
 import alluxio.thrift.BlockWorkerClientService;
 import alluxio.thrift.LockBlockResult;
@@ -299,7 +299,7 @@ public final class BlockWorkerClientServiceHandler implements BlockWorkerClientS
           LOG.error("Failed to serve request for {} bytes for block: {}", requestBytes, blockId, e);
           // We must wrap IOException in an AlluxioException here for backwards compatibility with
           // previous versions of our API.
-          throw new UnexpectedAlluxioException(e);
+          throw new UnavailableException(e);
         } catch (BlockDoesNotExistException e) {
           LOG.error("Failed to serve request for {} bytes for block: {}", requestBytes, blockId, e);
           throw e;

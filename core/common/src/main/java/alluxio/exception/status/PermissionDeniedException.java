@@ -31,7 +31,7 @@ public class PermissionDeniedException extends AlluxioStatusException {
   /**
    * @param cause the cause of the exception
    */
-  public PermissionDeniedException(ExceptionStatus status, Throwable cause) {
+  public PermissionDeniedException(Throwable cause) {
     this(cause.getMessage(), cause);
   }
 

@@ -11,6 +11,8 @@
 
 package alluxio.exception.status;
 
+import alluxio.thrift.TExceptionStatus;
+
 /**
  * A class representing gRPC status codes. The definitions are from
  * https://github.com/grpc/grpc-go/blob/v1.2.0/codes/codes.go.
@@ -30,7 +32,7 @@ public enum ExceptionStatus {
   // Note that this differs from FailedPrecondition. It indicates arguments
   // that are problematic regardless of the state of the system
   // (e.g., a malformed file name).
-  INVALID_ARGUMENT_EXCEPTION,
+  INVALID_ARGUMENT,
 
   // DeadlineExceeded means operation expired before completion.
   // For operations that change the state of the system, this error may be
@@ -82,7 +84,7 @@ public enum ExceptionStatus {
   //      REST Get/Update/Delete on a resource and the resource on the
   //      server does not match the condition. E.g., conflicting
   //      read-modify-write on the same resource.
-  FAILED_PRECONDTION,
+  FAILED_PRECONDITION,
 
   // Aborted indicates the operation was aborted, typically due to a
   // concurrency issue like sequencer check failures, transaction aborts,
@@ -128,4 +130,43 @@ public enum ExceptionStatus {
 
   // DataLoss indicates unrecoverable data loss or corruption.
   DATA_LOSS;
+
+  public static TExceptionStatus toThrift(ExceptionStatus status) {
+    switch (status) {
+      case ABORTED:
+        return TExceptionStatus.ABORTED;
+      case ALREADY_EXISTS:
+        return TExceptionStatus.ALREADY_EXISTS;
+      case CANCELED:
+        return TExceptionStatus.CANCELED;
+      case DATA_LOSS:
+        return TExceptionStatus.DATA_LOSS;
+      case DEADLINE_EXCEEDED:
+        return TExceptionStatus.DEADLINE_EXCEEDED;
+      case FAILED_PRECONDITION:
+        return TExceptionStatus.FAILED_PRECONDITION;
+      case INTERNAL:
+        return TExceptionStatus.INTERNAL;
+      case INVALID_ARGUMENT:
+        return TExceptionStatus.INVALID_ARGUMENT;
+      case NOT_FOUND:
+        return TExceptionStatus.NOT_FOUND;
+      case OUT_OF_RANGE:
+        return TExceptionStatus.OUT_OF_RANGE;
+      case PERMISSION_DENIED:
+        return TExceptionStatus.PERMISSION_DENIED;
+      case RESOURCE_EXHAUSTED:
+        return TExceptionStatus.RESOURCE_EXHAUSTED;
+      case UNAUTHENTICATED:
+        return TExceptionStatus.UNAUTHENTICATED;
+      case UNAVAILABLE:
+        return TExceptionStatus.UNAVAILABLE;
+      case UNIMPLEMENTED:
+        return TExceptionStatus.UNIMPLEMENTED;
+      case UNKNOWN:
+        return TExceptionStatus.UNKNOWN;
+      default:
+        return TExceptionStatus.UNKNOWN;
+    }
+  }
 }

@@ -57,6 +57,10 @@ public class AlluxioStatusException extends AlluxioException {
     return mStatus;
   }
 
+  public AlluxioTException toThrift() {
+    return new AlluxioTException(getMessage(), ExceptionStatus.toThrift(mStatus));
+  }
+
   /**
    * Converts an Alluxio exception from Thrift representation to native representation.
    *
@@ -66,35 +70,35 @@ public class AlluxioStatusException extends AlluxioException {
   public static AlluxioStatusException fromThrift(AlluxioTException e) {
     String m = e.getMessage();
     switch (e.getStatus()) {
-      case Canceled:
+      case CANCELED:
         return new CanceledException(m);
-      case InvalidArgument:
+      case INVALID_ARGUMENT:
         return new InvalidArgumentException(m);
-      case DeadlineExceeded:
+      case DEADLINE_EXCEEDED:
         return new DeadlineExceededException(m);
-      case NotFound:
+      case NOT_FOUND:
         return new NotFoundException(m);
-      case AlreadyExists:
+      case ALREADY_EXISTS:
         return new AlreadyExistsException(m);
-      case PermissionDenied:
+      case PERMISSION_DENIED:
         return new PermissionDeniedException(m);
-      case Unauthenticated:
+      case UNAUTHENTICATED:
         return new UnauthenticatedException(m);
-      case ResourceExhausted:
+      case RESOURCE_EXHAUSTED:
         return new ResourceExhaustedException(m);
-      case FailedPrecondition:
+      case FAILED_PRECONDITION:
         return new FailedPreconditionException(m);
-      case Aborted:
+      case ABORTED:
         return new AbortedException(m);
-      case OutOfRange:
+      case OUT_OF_RANGE:
         return new OutOfRangeException(m);
-      case Unimplemented:
+      case UNIMPLEMENTED:
         return new UnimplementedException(m);
-      case Internal:
+      case INTERNAL:
         return new InternalException(m);
-      case Unavailable:
+      case UNAVAILABLE:
         return new UnavailableException(m);
-      case DataLoss:
+      case DATA_LOSS:
         return new DataLossException(m);
       default:
         return new UnknownException(m);

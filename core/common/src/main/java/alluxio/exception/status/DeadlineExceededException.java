@@ -33,7 +33,7 @@ public class DeadlineExceededException extends AlluxioStatusException {
   /**
    * @param cause the cause of the exception
    */
-  public DeadlineExceededException(ExceptionStatus status, Throwable cause) {
+  public DeadlineExceededException(Throwable cause) {
     this(cause.getMessage(), cause);
   }
 

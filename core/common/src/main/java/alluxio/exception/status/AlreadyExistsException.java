@@ -28,7 +28,7 @@ public class AlreadyExistsException extends AlluxioStatusException {
   /**
    * @param cause the cause of the exception
    */
-  public AlreadyExistsException(ExceptionStatus status, Throwable cause) {
+  public AlreadyExistsException(Throwable cause) {
     this(cause.getMessage(), cause);
   }
 
