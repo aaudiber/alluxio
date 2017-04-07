@@ -149,7 +149,7 @@ public final class BlockMasterClient extends AbstractMasterClient {
   public synchronized void register(final long workerId, final List<String> storageTierAliases,
       final Map<String, Long> totalBytesOnTiers, final Map<String, Long> usedBytesOnTiers,
       final Map<String, List<Long>> currentBlocksOnTiers) throws AlluxioException, IOException {
-    retryRPC(new RpcCallableThrowsAlluxioTException<Void>() {
+    retryRPC(new RpcCallable<Void>() {
       @Override
       public Void call() throws AlluxioTException, TException {
         mClient.registerWorker(workerId, storageTierAliases, totalBytesOnTiers, usedBytesOnTiers,

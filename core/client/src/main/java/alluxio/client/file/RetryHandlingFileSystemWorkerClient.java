@@ -169,7 +169,7 @@ public final class RetryHandlingFileSystemWorkerClient
   @Override
   public void cancelUfsFile(final long tempUfsFileId, final CancelUfsFileOptions options)
       throws AlluxioException, IOException {
-    retryRPC(new RpcCallableThrowsAlluxioTException<Void, FileSystemWorkerClientService.Client>() {
+    retryRPC(new RpcCallable<Void, FileSystemWorkerClientService.Client>() {
       @Override
       public Void call(FileSystemWorkerClientService.Client client)
           throws AlluxioTException, TException {
@@ -182,7 +182,7 @@ public final class RetryHandlingFileSystemWorkerClient
   @Override
   public void closeUfsFile(final long tempUfsFileId, final CloseUfsFileOptions options)
       throws AlluxioException, IOException {
-    retryRPC(new RpcCallableThrowsAlluxioTException<Void, FileSystemWorkerClientService.Client>() {
+    retryRPC(new RpcCallable<Void, FileSystemWorkerClientService.Client>() {
       @Override
       public Void call(FileSystemWorkerClientService.Client client)
           throws AlluxioTException, TException {
@@ -196,7 +196,7 @@ public final class RetryHandlingFileSystemWorkerClient
   public long completeUfsFile(final long tempUfsFileId, final CompleteUfsFileOptions options)
       throws AlluxioException, IOException {
     return retryRPC(
-        new RpcCallableThrowsAlluxioTException<Long, FileSystemWorkerClientService.Client>() {
+        new RpcCallable<Long, FileSystemWorkerClientService.Client>() {
           @Override
           public Long call(FileSystemWorkerClientService.Client client)
               throws AlluxioTException, TException {
@@ -209,7 +209,7 @@ public final class RetryHandlingFileSystemWorkerClient
   public long createUfsFile(final AlluxioURI path, final CreateUfsFileOptions options)
       throws AlluxioException, IOException {
     return retryRPC(
-        new RpcCallableThrowsAlluxioTException<Long, FileSystemWorkerClientService.Client>() {
+        new RpcCallable<Long, FileSystemWorkerClientService.Client>() {
           @Override
           public Long call(FileSystemWorkerClientService.Client client)
               throws AlluxioTException, TException {
@@ -227,7 +227,7 @@ public final class RetryHandlingFileSystemWorkerClient
   public long openUfsFile(final AlluxioURI path, final OpenUfsFileOptions options)
       throws AlluxioException, IOException {
     return retryRPC(
-        new RpcCallableThrowsAlluxioTException<Long, FileSystemWorkerClientService.Client>() {
+        new RpcCallable<Long, FileSystemWorkerClientService.Client>() {
           @Override
           public Long call(FileSystemWorkerClientService.Client client)
               throws AlluxioTException, TException {

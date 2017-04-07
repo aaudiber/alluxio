@@ -12,6 +12,7 @@
 package alluxio.worker.file;
 
 import alluxio.AbstractMasterClient;
+import alluxio.AbstractThriftClient.RpcCallable;
 import alluxio.Constants;
 import alluxio.exception.AlluxioException;
 import alluxio.exception.ConnectionFailedException;
@@ -77,7 +78,7 @@ public final class FileSystemMasterClient extends AbstractMasterClient {
    * @throws IOException if an I/O error occurs
    */
   public synchronized FileInfo getFileInfo(final long fileId) throws AlluxioException, IOException {
-    return retryRPC(new RpcCallableThrowsAlluxioTException<FileInfo>() {
+    return retryRPC(new RpcCallable<FileInfo>() {
       @Override
       public FileInfo call() throws TException {
         return ThriftUtils.fromThrift(mClient.getFileInfo(fileId));
@@ -110,7 +111,7 @@ public final class FileSystemMasterClient extends AbstractMasterClient {
    */
   public synchronized FileSystemCommand heartbeat(final long workerId,
       final List<Long> persistedFiles) throws IOException, AlluxioException {
-    return retryRPC(new RpcCallableThrowsAlluxioTException<FileSystemCommand>() {
+    return retryRPC(new RpcCallable<FileSystemCommand>() {
       @Override
       public FileSystemCommand call() throws AlluxioTException, TException {
         return mClient.heartbeat(workerId, persistedFiles);
