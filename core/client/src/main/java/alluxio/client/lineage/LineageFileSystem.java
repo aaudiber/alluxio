@@ -113,6 +113,8 @@ public final class LineageFileSystem extends BaseFileSystem {
     LineageMasterClient masterClient = mLineageContext.acquireMasterClient();
     try {
       masterClient.reportLostFile(path.getPath());
+    } catch (NotFoundException e) {
+      throw new FileDoesNotExistException(e.getMessage());
     } finally {
       mLineageContext.releaseMasterClient(masterClient);
     }
