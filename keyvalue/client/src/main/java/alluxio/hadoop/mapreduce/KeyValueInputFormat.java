@@ -16,7 +16,6 @@ import alluxio.annotation.PublicApi;
 import alluxio.client.file.FileSystemContext;
 import alluxio.client.keyvalue.KeyValueMasterClient;
 import alluxio.client.keyvalue.KeyValueSystem;
-import alluxio.exception.AlluxioException;
 import alluxio.thrift.PartitionInfo;
 
 import org.apache.hadoop.fs.Path;
@@ -65,16 +64,12 @@ public final class KeyValueInputFormat extends InputFormat<BytesWritable, BytesW
     // {@code mapreduce.input.fileinputformat.inputdir}, each path should be a key-value store.
     Path[] paths = FileInputFormat.getInputPaths(jobContext);
     List<InputSplit> splits = new ArrayList<>();
-    try {
-      for (Path path : paths) {
-        List<PartitionInfo> partitionInfos =
-            mKeyValueMasterClient.getPartitionInfo(new AlluxioURI(path.toString()));
-        for (PartitionInfo partitionInfo : partitionInfos) {
-          splits.add(new KeyValueInputSplit(partitionInfo));
-        }
+    for (Path path : paths) {
+      List<PartitionInfo> partitionInfos =
+          mKeyValueMasterClient.getPartitionInfo(new AlluxioURI(path.toString()));
+      for (PartitionInfo partitionInfo : partitionInfos) {
+        splits.add(new KeyValueInputSplit(partitionInfo));
       }
-    } catch (AlluxioException e) {
-      throw new IOException(e);
     }
     return splits;
   }
