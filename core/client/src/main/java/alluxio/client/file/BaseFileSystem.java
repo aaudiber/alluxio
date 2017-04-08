@@ -34,6 +34,8 @@ import alluxio.exception.ExceptionMessage;
 import alluxio.exception.FileAlreadyExistsException;
 import alluxio.exception.FileDoesNotExistException;
 import alluxio.exception.InvalidPathException;
+import alluxio.exception.status.AlreadyExistsException;
+import alluxio.exception.status.FailedPreconditionException;
 import alluxio.exception.status.InvalidArgumentException;
 import alluxio.exception.status.NotFoundException;
 
@@ -88,6 +90,10 @@ public class BaseFileSystem implements FileSystem {
     try {
       masterClient.createDirectory(path, options);
       LOG.debug("Created directory " + path.getPath());
+    } catch (AlreadyExistsException e) {
+      throw new FileAlreadyExistsException(e.getMessage());
+    } catch (InvalidArgumentException e) {
+      throw new InvalidPathException(e.getMessage());
     } finally {
       mFileSystemContext.releaseMasterClient(masterClient);
     }
@@ -108,6 +114,10 @@ public class BaseFileSystem implements FileSystem {
       masterClient.createFile(path, options);
       status = masterClient.getStatus(path);
       LOG.debug("Created file " + path.getPath());
+    } catch (AlreadyExistsException e) {
+      throw new FileAlreadyExistsException(e.getMessage());
+    } catch (InvalidArgumentException e) {
+      throw new InvalidPathException(e.getMessage());
     } finally {
       mFileSystemContext.releaseMasterClient(masterClient);
     }
@@ -129,6 +139,10 @@ public class BaseFileSystem implements FileSystem {
     try {
       masterClient.delete(path, options);
       LOG.debug("Deleted file " + path.getName());
+    } catch (FailedPreconditionException e) {
+      throw new DirectoryNotEmptyException(e.getMessage());
+    } catch (NotFoundException e) {
+      throw new FileDoesNotExistException(e.getMessage());
     } finally {
       mFileSystemContext.releaseMasterClient(masterClient);
     }
@@ -170,6 +184,8 @@ public class BaseFileSystem implements FileSystem {
     try {
       masterClient.free(path, options);
       LOG.debug("Freed file " + path.getPath());
+    } catch (NotFoundException e) {
+      throw new FileDoesNotExistException(e.getMessage());
     } finally {
       mFileSystemContext.releaseMasterClient(masterClient);
     }
@@ -239,6 +255,8 @@ public class BaseFileSystem implements FileSystem {
     try {
       masterClient.loadMetadata(path, options);
       LOG.debug("loaded metadata {} with options {}", path.getParent(), options);
+    } catch (NotFoundException e) {
+      throw new FileDoesNotExistException(e.getMessage());
     } finally {
       mFileSystemContext.releaseMasterClient(masterClient);
     }
@@ -295,6 +313,8 @@ public class BaseFileSystem implements FileSystem {
       // TODO(calvin): Update this code on the master side.
       masterClient.rename(src, dst);
       LOG.debug("Renamed file " + src.getPath() + " to " + dst.getPath());
+    } catch (NotFoundException e) {
+      throw new FileDoesNotExistException(e.getMessage());
     } finally {
       mFileSystemContext.releaseMasterClient(masterClient);
     }
@@ -313,6 +333,8 @@ public class BaseFileSystem implements FileSystem {
     try {
       masterClient.setAttribute(path, options);
       LOG.debug("Set attributes for path {} with options {}", path.getPath(), options);
+    } catch (NotFoundException e) {
+      throw new FileDoesNotExistException(e.getMessage());
     } finally {
       mFileSystemContext.releaseMasterClient(masterClient);
     }
