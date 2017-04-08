@@ -18,7 +18,6 @@ import alluxio.client.block.BlockMasterClientPool;
 import alluxio.client.block.BlockWorkerClient;
 import alluxio.client.block.BlockWorkerThriftClientPool;
 import alluxio.client.netty.NettyClient;
-import alluxio.exception.AlluxioException;
 import alluxio.exception.ExceptionMessage;
 import alluxio.metrics.MetricsSystem;
 import alluxio.network.connection.NettyChannelPool;
@@ -437,8 +436,6 @@ public final class FileSystemContext implements Closeable {
     BlockMasterClient blockMasterClient = mBlockMasterClientPool.acquire();
     try {
       infos = blockMasterClient.getWorkerInfoList();
-    } catch (AlluxioException e) {
-      throw new IOException(e);
     } finally {
       mBlockMasterClientPool.release(blockMasterClient);
     }

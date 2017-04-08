@@ -20,7 +20,6 @@ import alluxio.client.file.options.InStreamOptions;
 import alluxio.client.file.options.OutStreamOptions;
 import alluxio.client.file.policy.FileWriteLocationPolicy;
 import alluxio.exception.AlluxioException;
-import alluxio.exception.ConnectionFailedException;
 import alluxio.exception.ExceptionMessage;
 import alluxio.exception.PreconditionMessage;
 import alluxio.resource.CloseableResource;
@@ -31,9 +30,9 @@ import alluxio.wire.BlockLocation;
 import alluxio.wire.WorkerInfo;
 import alluxio.wire.WorkerNetAddress;
 
+import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.google.common.base.Preconditions;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -92,14 +91,11 @@ public final class AlluxioBlockStore {
    *
    * @param blockId the blockId to obtain information about
    * @return a {@link BlockInfo} containing the metadata of the block
-   * @throws IOException if the block does not exist
    */
-  public BlockInfo getInfo(long blockId) throws IOException {
+  public BlockInfo getInfo(long blockId) {
     try (CloseableResource<BlockMasterClient> masterClientResource =
         mContext.acquireBlockMasterClientResource()) {
       return masterClientResource.get().getBlockInfo(blockId);
-    } catch (AlluxioException e) {
-      throw new IOException(e);
     }
   }
 
@@ -126,7 +122,6 @@ public final class AlluxioBlockStore {
    * @param blockId the block to read from
    * @param options the options
    * @return an {@link InputStream} which can be used to read the data in a streaming fashion
-   * @throws IOException if the block does not exist
    */
   public BlockInStream getInStream(long blockId, InStreamOptions options)
       throws IOException {
@@ -134,8 +129,6 @@ public final class AlluxioBlockStore {
     try (CloseableResource<BlockMasterClient> masterClientResource =
         mContext.acquireBlockMasterClientResource()) {
       blockInfo = masterClientResource.get().getBlockInfo(blockId);
-    } catch (AlluxioException e) {
-      throw new IOException(e);
     }
 
     if (blockInfo.getLocations().isEmpty()) {
@@ -185,7 +178,6 @@ public final class AlluxioBlockStore {
    * @param options the output stream options
    * @return an {@link BlockOutStream} which can be used to write data to the block in a
    *         streaming fashion
-   * @throws IOException if the block cannot be written
    */
   public BlockOutStream getOutStream(long blockId, long blockSize, WorkerNetAddress address,
       OutStreamOptions options) throws IOException {
@@ -193,8 +185,6 @@ public final class AlluxioBlockStore {
       try (CloseableResource<BlockMasterClient> blockMasterClientResource =
           mContext.acquireBlockMasterClientResource()) {
         blockSize = blockMasterClientResource.get().getBlockInfo(blockId).getLength();
-      } catch (AlluxioException e) {
-        throw new IOException(e);
       }
     }
     // No specified location to write to.
@@ -248,8 +238,6 @@ public final class AlluxioBlockStore {
     try (CloseableResource<BlockMasterClient> blockMasterClientResource =
         mContext.acquireBlockMasterClientResource()) {
       return blockMasterClientResource.get().getCapacityBytes();
-    } catch (ConnectionFailedException e) {
-      throw new IOException(e);
     }
   }
 
@@ -263,8 +251,6 @@ public final class AlluxioBlockStore {
     try (CloseableResource<BlockMasterClient> blockMasterClientResource =
         mContext.acquireBlockMasterClientResource()) {
       return blockMasterClientResource.get().getUsedBytes();
-    } catch (ConnectionFailedException e) {
-      throw new IOException(e);
     }
   }
 
@@ -281,8 +267,6 @@ public final class AlluxioBlockStore {
     try (CloseableResource<BlockMasterClient> blockMasterClientResource =
         mContext.acquireBlockMasterClientResource()) {
       info = blockMasterClientResource.get().getBlockInfo(blockId);
-    } catch (AlluxioException e) {
-      throw new IOException(e);
     }
     if (info.getLocations().isEmpty()) {
       // Nothing to promote
