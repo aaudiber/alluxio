@@ -17,7 +17,6 @@ import alluxio.client.lineage.options.CreateLineageOptions;
 import alluxio.client.lineage.options.DeleteLineageOptions;
 import alluxio.client.lineage.options.GetLineageInfoListOptions;
 import alluxio.exception.AlluxioException;
-import alluxio.exception.ConnectionFailedException;
 import alluxio.exception.FileDoesNotExistException;
 import alluxio.exception.LineageDeletionException;
 import alluxio.exception.LineageDoesNotExistException;
@@ -94,8 +93,6 @@ public abstract class AbstractLineageClient implements LineageClient {
 
     try {
       return masterClient.getLineageInfoList();
-    } catch (ConnectionFailedException e) {
-      throw new IOException(e);
     } finally {
       mContext.releaseMasterClient(masterClient);
     }
