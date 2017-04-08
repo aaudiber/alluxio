@@ -11,17 +11,17 @@
 
 package alluxio;
 
-import alluxio.exception.ConnectionFailedException;
 import alluxio.exception.ExceptionMessage;
 import alluxio.exception.PreconditionMessage;
 import alluxio.exception.status.AlluxioStatusException;
+import alluxio.exception.status.InternalException;
+import alluxio.exception.status.UnauthenticatedException;
 import alluxio.exception.status.UnavailableException;
 import alluxio.retry.ExponentialBackoffRetry;
 import alluxio.retry.RetryPolicy;
 import alluxio.security.authentication.TransportProvider;
 import alluxio.thrift.AlluxioService;
 import alluxio.thrift.AlluxioTException;
-import alluxio.thrift.ThriftIOException;
 
 import com.google.common.base.Preconditions;
 import org.apache.thrift.TException;
@@ -159,11 +159,8 @@ public abstract class AbstractClient implements Client {
 
   /**
    * Connects with the remote.
-   *
-   * @throws IOException if an I/O error occurs
-   * @throws ConnectionFailedException if network connection failed
    */
-  public synchronized void connect() throws IOException, ConnectionFailedException {
+  public synchronized void connect() {
     if (mConnected) {
       return;
     }
@@ -177,9 +174,13 @@ public abstract class AbstractClient implements Client {
       LOG.info("Alluxio client (version {}) is trying to connect with {} {} @ {}",
           RuntimeConstants.VERSION, getServiceName(), mMode, mAddress);
 
-      TProtocol binaryProtocol =
-          new TBinaryProtocol(mTransportProvider.getClientTransport(mParentSubject, mAddress));
-      mProtocol = new TMultiplexedProtocol(binaryProtocol, getServiceName());
+      try {
+        TProtocol binaryProtocol =
+            new TBinaryProtocol(mTransportProvider.getClientTransport(mParentSubject, mAddress));
+        mProtocol = new TMultiplexedProtocol(binaryProtocol, getServiceName());
+      } catch (IOException e) {
+        throw new UnauthenticatedException(e);
+      }
       try {
         mProtocol.getTransport().open();
         LOG.info("Client registered with {} {} @ {}", getServiceName(), mMode, mAddress);
@@ -196,9 +197,10 @@ public abstract class AbstractClient implements Client {
               + "Please consult %s for common solutions to address this problem.",
               getServiceName(), mMode, mAddress, e.getMessage(),
               RuntimeConstants.ALLUXIO_DEBUG_DOCS_URL);
-          throw new IOException(message, e);
+          throw new InternalException(message, e);
         }
-        throw e;
+        // TODO(andrew): Determine a more specific exception here
+        throw new UnavailableException(e);
       } catch (TTransportException e) {
         LOG.warn("Failed to connect ({}) to {} {} @ {}: {}", retryPolicy.getRetryCount(),
             getServiceName(), mMode, mAddress, e.getMessage());
@@ -207,7 +209,7 @@ public abstract class AbstractClient implements Client {
           String message = "Thrift transport open times out. Please check whether the "
               + "authentication types match between client and server. Note that NOSASL client "
               + "is not able to connect to servers with SIMPLE security mode.";
-          throw new IOException(message, e);
+          throw new UnavailableException(message, e);
         }
         // TODO(peis): Consider closing the connection here as well.
         if (!retryPolicy.attemptRetry()) {
@@ -216,7 +218,7 @@ public abstract class AbstractClient implements Client {
       }
     }
     // Reaching here indicates that we did not successfully connect.
-    throw new ConnectionFailedException("Failed to connect to " + getServiceName() + " " + mMode
+    throw new UnavailableException("Failed to connect to " + getServiceName() + " " + mMode
         + " @ " + mAddress + " after " + (retryPolicy.getRetryCount()) + " attempts");
   }
 
@@ -285,18 +287,16 @@ public abstract class AbstractClient implements Client {
   /**
    * Tries to execute an RPC defined as a {@link RpcCallable}.
    *
-   * If an {@link UnavailableException} internal Thrift exception occurs, a reconnection will be
-   * tried through {@link #connect()} and the action will be re-executed.
+   * If an {@link UnavailableException} or an internal Thrift exception occurs, a reconnection will
+   * be tried through {@link #connect()} and the action will be re-executed.
    *
    * @param rpc the RPC call to be executed
    * @param <V> type of return value of the RPC call
    * @return the return value of the RPC call
-   * @throws IOException when retries exceeds {@link #RPC_MAX_NUM_RETRY} or {@link #close()} has
-   *         been called before calling this method or during the retry
-   * @throws ConnectionFailedException if network connection failed
+   * @throws {@link UnavailableException} when retries exceeds {@link #RPC_MAX_NUM_RETRY} or
+   *         {@link #close()} has been called before calling this method or during the retry
    */
-  protected synchronized <V> V retryRPC(RpcCallable<V> rpc) throws IOException,
-      ConnectionFailedException {
+  protected synchronized <V> V retryRPC(RpcCallable<V> rpc) {
     RetryPolicy retryPolicy =
         new ExponentialBackoffRetry(BASE_SLEEP_MS, MAX_SLEEP_MS, RPC_MAX_NUM_RETRY);
     while (!mClosed) {
@@ -304,8 +304,6 @@ public abstract class AbstractClient implements Client {
       Exception retryableException;
       try {
         return rpc.call();
-      } catch (ThriftIOException e) {
-        throw new IOException(e);
       } catch (AlluxioTException e) {
         try {
           throw AlluxioStatusException.fromThrift(e);
@@ -315,12 +313,12 @@ public abstract class AbstractClient implements Client {
       } catch (TException e) {
         retryableException = e;
       }
-      LOG.info("Retrying failed RPC. Error: {}", retryableException.getMessage());
+      LOG.info("RPC attempt failed. Error: {}", retryableException.getMessage());
       disconnect();
       if (!retryPolicy.attemptRetry()) {
         break;
       }
     }
-    throw new IOException("Failed after " + retryPolicy.getRetryCount() + " retries.");
+    throw new UnavailableException("Failed after " + retryPolicy.getRetryCount() + " retries.");
   }
 }
