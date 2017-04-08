@@ -14,6 +14,7 @@ package alluxio.worker.file;
 import alluxio.Configuration;
 import alluxio.PropertyKey;
 import alluxio.exception.AlluxioException;
+import alluxio.exception.status.AlluxioStatusException;
 import alluxio.heartbeat.HeartbeatExecutor;
 import alluxio.thrift.CommandType;
 import alluxio.thrift.FileSystemCommand;
@@ -85,7 +86,7 @@ final class FileWorkerMasterSyncExecutor implements HeartbeatExecutor {
     FileSystemCommand command;
     try {
       command = mMasterClient.heartbeat(mWorkerId.get(), persistedFiles);
-    } catch (IOException | AlluxioException e) {
+    } catch (AlluxioStatusException e) {
       LOG.error("Failed to heartbeat to master", e);
       return;
     }

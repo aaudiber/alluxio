@@ -15,7 +15,6 @@ import alluxio.Configuration;
 import alluxio.Constants;
 import alluxio.PropertyKey;
 import alluxio.Sessions;
-import alluxio.exception.AlluxioException;
 import alluxio.exception.BlockAlreadyExistsException;
 import alluxio.exception.BlockDoesNotExistException;
 import alluxio.exception.ExceptionMessage;
@@ -431,11 +430,7 @@ public final class DefaultBlockWorker extends AbstractWorker implements BlockWor
 
   @Override
   public FileInfo getFileInfo(long fileId) throws IOException {
-    try {
-      return mFileSystemMasterClient.getFileInfo(fileId);
-    } catch (AlluxioException e) {
-      throw new IOException(e);
-    }
+    return mFileSystemMasterClient.getFileInfo(fileId);
   }
 
   @Override
