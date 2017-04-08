@@ -292,8 +292,6 @@ public class FileOutStream extends AbstractOutStream {
     try (CloseableResource<FileSystemMasterClient> masterClient = mContext
         .acquireMasterClientResource()) {
       return masterClient.get().getNewBlockIdForFile(mUri);
-    } catch (AlluxioException e) {
-      throw new IOException(e);
     }
   }
 
@@ -318,8 +316,6 @@ public class FileOutStream extends AbstractOutStream {
     try (CloseableResource<FileSystemMasterClient> masterClient = mContext
         .acquireMasterClientResource()) {
       masterClient.get().scheduleAsyncPersist(mUri);
-    } catch (AlluxioException e) {
-      throw new IOException(e);
     }
   }
 

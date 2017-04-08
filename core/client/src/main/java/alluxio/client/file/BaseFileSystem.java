@@ -34,6 +34,8 @@ import alluxio.exception.ExceptionMessage;
 import alluxio.exception.FileAlreadyExistsException;
 import alluxio.exception.FileDoesNotExistException;
 import alluxio.exception.InvalidPathException;
+import alluxio.exception.status.InvalidArgumentException;
+import alluxio.exception.status.NotFoundException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -146,8 +148,10 @@ public class BaseFileSystem implements FileSystem {
       // TODO(calvin): Make this more efficient
       masterClient.getStatus(path);
       return true;
-    } catch (FileDoesNotExistException | InvalidPathException e) {
+    } catch (NotFoundException e) {
       return false;
+    } catch (InvalidArgumentException e) {
+      throw new InvalidPathException(e.getMessage());
     } finally {
       mFileSystemContext.releaseMasterClient(masterClient);
     }
@@ -183,7 +187,7 @@ public class BaseFileSystem implements FileSystem {
     FileSystemMasterClient masterClient = mFileSystemContext.acquireMasterClient();
     try {
       return masterClient.getStatus(path);
-    } catch (FileDoesNotExistException | InvalidPathException e) {
+    } catch (NotFoundException e) {
       throw new FileDoesNotExistException(ExceptionMessage.PATH_DOES_NOT_EXIST.getMessage(path));
     } finally {
       mFileSystemContext.releaseMasterClient(masterClient);
@@ -203,7 +207,7 @@ public class BaseFileSystem implements FileSystem {
     // TODO(calvin): Fix the exception handling in the master
     try {
       return masterClient.listStatus(path, options);
-    } catch (FileDoesNotExistException e) {
+    } catch (NotFoundException e) {
       throw new FileDoesNotExistException(ExceptionMessage.PATH_DOES_NOT_EXIST.getMessage(path));
     } finally {
       mFileSystemContext.releaseMasterClient(masterClient);
