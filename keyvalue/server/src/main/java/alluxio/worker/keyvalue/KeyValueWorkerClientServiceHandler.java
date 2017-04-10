@@ -23,7 +23,6 @@ import alluxio.exception.BlockDoesNotExistException;
 import alluxio.exception.InvalidWorkerStateException;
 import alluxio.thrift.AlluxioTException;
 import alluxio.thrift.KeyValueWorkerClientService;
-import alluxio.thrift.ThriftIOException;
 import alluxio.util.io.BufferUtils;
 import alluxio.worker.block.BlockWorker;
 import alluxio.worker.block.io.BlockReader;
@@ -75,7 +74,7 @@ public final class KeyValueWorkerClientServiceHandler implements KeyValueWorkerC
    */
   @Override
   public ByteBuffer get(final long blockId, final ByteBuffer key)
-      throws AlluxioTException, ThriftIOException {
+      throws AlluxioTException {
     return RpcUtils.call(LOG, new RpcCallable<ByteBuffer>() {
       @Override
       public ByteBuffer call() throws AlluxioException, IOException {
@@ -131,7 +130,7 @@ public final class KeyValueWorkerClientServiceHandler implements KeyValueWorkerC
 
   @Override
   public List<ByteBuffer> getNextKeys(final long blockId, final ByteBuffer key, final int numKeys)
-      throws AlluxioTException, ThriftIOException {
+      throws AlluxioTException {
     return RpcUtils.call(LOG, new RpcCallable<List<ByteBuffer>>() {
       @Override
       public List<ByteBuffer> call() throws AlluxioException, IOException {
@@ -166,7 +165,7 @@ public final class KeyValueWorkerClientServiceHandler implements KeyValueWorkerC
 
   // TODO(cc): Try to remove the duplicated try-catch logic in other methods like getNextKeys.
   @Override
-  public int getSize(final long blockId) throws AlluxioTException, ThriftIOException {
+  public int getSize(final long blockId) throws AlluxioTException {
     return RpcUtils.call(LOG, new RpcCallable<Integer>() {
       @Override
       public Integer call() throws AlluxioException, IOException {

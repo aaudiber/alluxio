@@ -30,7 +30,6 @@ import alluxio.retry.RetryPolicy;
 import alluxio.retry.TimeoutRetry;
 import alluxio.thrift.AlluxioTException;
 import alluxio.thrift.BlockWorkerClientService;
-import alluxio.thrift.ThriftIOException;
 import alluxio.util.ThreadFactoryUtils;
 import alluxio.util.network.NetworkAddressUtils;
 import alluxio.wire.LockBlockResult;
@@ -348,9 +347,6 @@ public final class RetryHandlingBlockWorkerClient
       } catch (AlluxioTException e) {
         LOG.warn(e.getMessage());
         throw new IOException(AlluxioStatusException.fromThrift(e));
-      } catch (ThriftIOException e) {
-        LOG.warn(e.getMessage());
-        throw new IOException(e);
       } catch (TException e) {
         client.getOutputProtocol().getTransport().close();
         exception = e;

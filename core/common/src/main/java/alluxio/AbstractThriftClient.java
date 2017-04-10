@@ -17,7 +17,6 @@ import alluxio.retry.ExponentialBackoffRetry;
 import alluxio.retry.RetryPolicy;
 import alluxio.thrift.AlluxioService;
 import alluxio.thrift.AlluxioTException;
-import alluxio.thrift.ThriftIOException;
 
 import com.google.common.base.Preconditions;
 import org.apache.thrift.TException;
@@ -76,8 +75,7 @@ public abstract class AbstractThriftClient<C extends AlluxioService.Client> {
    * @param rpc the RPC call to be executed
    * @param <V> type of return value of the RPC call
    * @return the return value of the RPC call
-   * @throws IOException when retries exceeds {@link #RPC_MAX_NUM_RETRY} or some server
-   *         side IOException occurred.
+   * @throws IOException when retries exceeds {@link #RPC_MAX_NUM_RETRY}
    */
   protected <V> V retryRPC(RpcCallable<V, C> rpc) throws IOException {
     TException exception;
@@ -87,8 +85,6 @@ public abstract class AbstractThriftClient<C extends AlluxioService.Client> {
       C client = acquireClient();
       try {
         return rpc.call(client);
-      } catch (ThriftIOException e) {
-        throw new IOException(e);
       } catch (AlluxioTException e) {
         AlluxioStatusException ase = AlluxioStatusException.fromThrift(e);
         processException(client, ase);

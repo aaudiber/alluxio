@@ -15,7 +15,6 @@ import alluxio.AlluxioURI;
 import alluxio.Constants;
 import alluxio.RpcUtils;
 import alluxio.RpcUtils.RpcCallable;
-import alluxio.RpcUtils.RpcCallable;
 import alluxio.exception.AlluxioException;
 import alluxio.job.CommandLineJob;
 import alluxio.job.JobConf;
@@ -23,7 +22,6 @@ import alluxio.thrift.AlluxioTException;
 import alluxio.thrift.CommandLineJobInfo;
 import alluxio.thrift.LineageInfo;
 import alluxio.thrift.LineageMasterClientService;
-import alluxio.thrift.ThriftIOException;
 import alluxio.thrift.TTtlAction;
 import alluxio.wire.ThriftUtils;
 
@@ -64,7 +62,7 @@ public final class LineageMasterClientServiceHandler implements LineageMasterCli
 
   @Override
   public long createLineage(final List<String> inputFiles, final List<String> outputFiles,
-      final CommandLineJobInfo jobInfo) throws AlluxioTException, ThriftIOException {
+      final CommandLineJobInfo jobInfo) throws AlluxioTException {
     return RpcUtils.call(LOG, new RpcCallable<Long>() {
       @Override
       public Long call() throws AlluxioException, IOException {

@@ -21,13 +21,13 @@ import alluxio.client.file.options.CompleteUfsFileOptions;
 import alluxio.client.file.options.CreateUfsFileOptions;
 import alluxio.client.file.options.OpenUfsFileOptions;
 import alluxio.exception.AlluxioException;
+import alluxio.exception.status.UnavailableException;
 import alluxio.metrics.MetricsSystem;
 import alluxio.retry.CountingRetry;
 import alluxio.retry.ExponentialBackoffRetry;
 import alluxio.retry.RetryPolicy;
 import alluxio.thrift.AlluxioTException;
 import alluxio.thrift.FileSystemWorkerClientService;
-import alluxio.thrift.ThriftIOException;
 import alluxio.util.ThreadFactoryUtils;
 import alluxio.util.network.NetworkAddressUtils;
 import alluxio.wire.WorkerNetAddress;
@@ -167,16 +167,19 @@ public final class RetryHandlingFileSystemWorkerClient
   }
 
   @Override
-  public void cancelUfsFile(final long tempUfsFileId, final CancelUfsFileOptions options)
-      throws AlluxioException, IOException {
-    retryRPC(new RpcCallable<Void, FileSystemWorkerClientService.Client>() {
-      @Override
-      public Void call(FileSystemWorkerClientService.Client client)
-          throws AlluxioTException, TException {
-        client.cancelUfsFile(mSessionId, tempUfsFileId, options.toThrift());
-        return null;
-      }
-    });
+  public void cancelUfsFile(final long tempUfsFileId, final CancelUfsFileOptions options) {
+    try {
+      retryRPC(new RpcCallable<Void, FileSystemWorkerClientService.Client>() {
+        @Override
+        public Void call(FileSystemWorkerClientService.Client client)
+            throws TException {
+          client.cancelUfsFile(mSessionId, tempUfsFileId, options.toThrift());
+          return null;
+        }
+      });
+    } catch (IOException e) {
+      throw new UnavailableException(e.getMessage(), e);
+    }
   }
 
   @Override
@@ -245,7 +248,7 @@ public final class RetryHandlingFileSystemWorkerClient
         client.sessionHeartbeat(mSessionId, null);
         Metrics.FILE_SYSTEM_WORKER_HEARTBEATS.inc();
         return;
-      } catch (AlluxioTException | ThriftIOException e) {
+      } catch (AlluxioTException e) {
         exception = e;
         LOG.warn(e.getMessage());
       } catch (TException e) {
