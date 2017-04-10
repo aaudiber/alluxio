@@ -13,7 +13,6 @@ package alluxio.client.block;
 
 import alluxio.client.block.options.LockBlockOptions;
 import alluxio.client.resource.LockBlockResource;
-import alluxio.exception.AlluxioException;
 import alluxio.retry.RetryPolicy;
 import alluxio.wire.WorkerNetAddress;
 
@@ -55,27 +54,22 @@ public interface BlockWorkerClient extends Closeable {
    * Updates the latest block access time on the worker.
    *
    * @param blockId the ID of the block
-   * @throws IOException if an I/O error occurs
    */
-  void accessBlock(final long blockId) throws IOException;
+  void accessBlock(final long blockId);
 
   /**
    * Notifies the worker the block is cached.
    *
    * @param blockId the ID of the block
-   * @throws IOException if an I/O error occurs
-   * @throws AlluxioException if an Alluxio error occurs
    */
-  void cacheBlock(final long blockId) throws IOException, AlluxioException;
+  void cacheBlock(final long blockId);
 
   /**
    * Notifies worker that the block has been cancelled.
    *
    * @param blockId the ID of the block to be cancelled
-   * @throws IOException if an I/O error occurs
-   * @throws AlluxioException if an Alluxio error occurs
    */
-  void cancelBlock(final long blockId) throws IOException, AlluxioException;
+  void cancelBlock(final long blockId);
 
   /**
    * @return the address of the worker's data server
@@ -99,11 +93,8 @@ public interface BlockWorkerClient extends Closeable {
    * @param blockId the ID of the block
    * @param options the lock block options
    * @return the lock block result
-   * @throws IOException if a non-Alluxio exception occurs
-   * @throws AlluxioException if an Alluxio error occurs
    */
-  LockBlockResource lockBlock(final long blockId, final LockBlockOptions options)
-      throws IOException, AlluxioException;
+  LockBlockResource lockBlock(final long blockId, final LockBlockOptions options);
 
   /**
    * A wrapper over {@link BlockWorkerClient#lockBlock(long, LockBlockOptions)} to lock a block
@@ -113,30 +104,23 @@ public interface BlockWorkerClient extends Closeable {
    * @param blockId the block ID
    * @param options the lock block options
    * @return the lock block result
-   * @throws IOException if a non-Alluxio exception occurs
-   * @throws AlluxioException if an Alluxio error occurs
    */
-  LockBlockResource lockUfsBlock(final long blockId, final LockBlockOptions options)
-      throws IOException, AlluxioException;
+  LockBlockResource lockUfsBlock(final long blockId, final LockBlockOptions options);
 
   /**
    * Promotes block back to the top StorageTier.
    *
    * @param blockId the ID of the block that will be promoted
    * @return true if succeed, false otherwise
-   * @throws IOException if an I/O error occurs
-   * @throws AlluxioException if an Alluxio error occurs
    */
-  boolean promoteBlock(final long blockId) throws IOException, AlluxioException;
+  boolean promoteBlock(final long blockId);
 
   /**
    * Removes a block from the internal storage of this worker.
    *
    * @param blockId the ID of the block that will be removed
-   * @throws IOException if an I/O error occurs
-   * @throws AlluxioException if an Alluxio error occurs
    */
-  void removeBlock(final long blockId) throws IOException, AlluxioException;
+  void removeBlock(final long blockId);
 
   /**
    * Gets temporary path for the block from the worker.
@@ -145,10 +129,8 @@ public interface BlockWorkerClient extends Closeable {
    * @param initialBytes the initial size bytes allocated for the block
    * @param tier the target tier
    * @return the temporary path of the block
-   * @throws IOException if a non-Alluxio exception occurs
    */
-  String requestBlockLocation(final long blockId, final long initialBytes, final int tier)
-      throws IOException;
+  String requestBlockLocation(final long blockId, final long initialBytes, final int tier);
 
   /**
    * Requests space for some block from worker.
@@ -157,26 +139,23 @@ public interface BlockWorkerClient extends Closeable {
    * @param requestBytes the requested space size, in bytes
    * @return true if space was successfully allocated, false if the worker is unable to allocate
    *         space due to space exhaustion
-   * @throws IOException if an exception occurs
    */
-  boolean requestSpace(final long blockId, final long requestBytes) throws IOException;
+  boolean requestSpace(final long blockId, final long requestBytes);
 
   /**
    * Unlocks the block.
    *
    * @param blockId the ID of the block
    * @return true if success, false otherwise
-   * @throws IOException if an I/O error occurs
    */
-  boolean unlockBlock(final long blockId) throws IOException;
+  boolean unlockBlock(final long blockId);
 
   /**
    * Sends a session heartbeat to the worker. This renews the client's lease on resources such as
    * locks and temporary files.
    *
    * @param retryPolicy the retry policy to use
-   * @throws IOException if an I/O error occurs
    * @throws InterruptedException if this thread is interrupted
    */
-  void sessionHeartbeat(RetryPolicy retryPolicy) throws IOException, InterruptedException;
+  void sessionHeartbeat(RetryPolicy retryPolicy) throws InterruptedException;
 }

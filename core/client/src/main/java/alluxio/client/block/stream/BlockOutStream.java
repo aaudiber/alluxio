@@ -16,7 +16,6 @@ import alluxio.client.Cancelable;
 import alluxio.client.block.BlockWorkerClient;
 import alluxio.client.file.FileSystemContext;
 import alluxio.client.file.options.OutStreamOptions;
-import alluxio.exception.AlluxioException;
 import alluxio.proto.dataserver.Protocol;
 import alluxio.wire.WorkerNetAddress;
 
@@ -160,8 +159,6 @@ public class BlockOutStream extends FilterOutputStream implements BoundedStream,
       if (remaining() < mBlockSize) {
         mBlockWorkerClient.cacheBlock(mBlockId);
       }
-    } catch (AlluxioException e) {
-      mCloser.rethrow(new IOException(e));
     } catch (Throwable e) {
       mCloser.rethrow(e);
     } finally {

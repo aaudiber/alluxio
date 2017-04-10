@@ -278,8 +278,6 @@ public final class AlluxioBlockStore {
         info.getLocations().get(0).getWorkerAddress(), null  /* no session */);
     try {
       blockWorkerClient.promoteBlock(blockId);
-    } catch (AlluxioException e) {
-      throw new IOException(e);
     } finally {
       blockWorkerClient.close();
     }

@@ -18,11 +18,11 @@ import alluxio.PropertyKey;
 import alluxio.RuntimeConstants;
 import alluxio.client.block.options.LockBlockOptions;
 import alluxio.client.resource.LockBlockResource;
-import alluxio.exception.AlluxioException;
 import alluxio.exception.ExceptionMessage;
-import alluxio.exception.UfsBlockAccessTokenUnavailableException;
 import alluxio.exception.status.AlluxioStatusException;
 import alluxio.exception.status.ResourceExhaustedException;
+import alluxio.exception.status.UnavailableException;
+import alluxio.exception.status.UnknownException;
 import alluxio.metrics.MetricsSystem;
 import alluxio.retry.CountingRetry;
 import alluxio.retry.ExponentialBackoffRetry;
@@ -181,7 +181,7 @@ public final class RetryHandlingBlockWorkerClient
   }
 
   @Override
-  public void accessBlock(final long blockId) throws IOException {
+  public void accessBlock(final long blockId) {
     retryRPC(new RpcCallable<Void, BlockWorkerClientService.Client>() {
       @Override
       public Void call(BlockWorkerClientService.Client client) throws TException {
@@ -192,7 +192,7 @@ public final class RetryHandlingBlockWorkerClient
   }
 
   @Override
-  public void cacheBlock(final long blockId) throws IOException, AlluxioException {
+  public void cacheBlock(final long blockId) {
     retryRPC(new RpcCallable<Void, BlockWorkerClientService.Client>() {
       @Override
       public Void call(BlockWorkerClientService.Client client)
@@ -204,7 +204,7 @@ public final class RetryHandlingBlockWorkerClient
   }
 
   @Override
-  public void cancelBlock(final long blockId) throws IOException, AlluxioException {
+  public void cancelBlock(final long blockId) {
     retryRPC(new RpcCallable<Void, BlockWorkerClientService.Client>() {
       @Override
       public Void call(BlockWorkerClientService.Client client)
@@ -227,8 +227,7 @@ public final class RetryHandlingBlockWorkerClient
   }
 
   @Override
-  public LockBlockResource lockBlock(final long blockId, final LockBlockOptions options)
-      throws IOException, AlluxioException {
+  public LockBlockResource lockBlock(final long blockId, final LockBlockOptions options) {
     LockBlockResult result = retryRPC(
         new RpcCallable<LockBlockResult, BlockWorkerClientService.Client>() {
           @Override
@@ -242,8 +241,7 @@ public final class RetryHandlingBlockWorkerClient
   }
 
   @Override
-  public LockBlockResource lockUfsBlock(final long blockId, final LockBlockOptions options)
-      throws IOException, AlluxioException {
+  public LockBlockResource lockUfsBlock(final long blockId, final LockBlockOptions options) {
     int retryInterval = Constants.SECOND_MS;
     RetryPolicy retryPolicy = new TimeoutRetry(Configuration
         .getLong(PropertyKey.USER_UFS_BLOCK_OPEN_TIMEOUT_MS), retryInterval);
@@ -256,12 +254,12 @@ public final class RetryHandlingBlockWorkerClient
         return resource;
       }
     } while (retryPolicy.attemptRetry());
-    throw new UfsBlockAccessTokenUnavailableException(
-        ExceptionMessage.UFS_BLOCK_ACCESS_TOKEN_UNAVAILABLE, blockId, options.getUfsPath());
+    throw new UnavailableException(ExceptionMessage.UFS_BLOCK_ACCESS_TOKEN_UNAVAILABLE
+        .getMessage(blockId, options.getUfsPath()));
   }
 
   @Override
-  public boolean promoteBlock(final long blockId) throws IOException, AlluxioException {
+  public boolean promoteBlock(final long blockId) {
     return retryRPC(
         new RpcCallable<Boolean, BlockWorkerClientService.Client>() {
           @Override
@@ -273,7 +271,7 @@ public final class RetryHandlingBlockWorkerClient
   }
 
   @Override
-  public void removeBlock(final long blockId) throws IOException, AlluxioException {
+  public void removeBlock(final long blockId) {
     retryRPC(new RpcCallable<Void, BlockWorkerClientService.Client>() {
       @Override
       public Void call(BlockWorkerClientService.Client client)
@@ -286,7 +284,7 @@ public final class RetryHandlingBlockWorkerClient
 
   @Override
   public String requestBlockLocation(final long blockId, final long initialBytes,
-      final int writeTier) throws IOException {
+      final int writeTier) {
     try {
       return retryRPC(
           new RpcCallable<String, BlockWorkerClientService.Client>() {
@@ -297,13 +295,14 @@ public final class RetryHandlingBlockWorkerClient
             }
           });
     } catch (ResourceExhaustedException e) {
-      throw new IOException(ExceptionMessage.CANNOT_REQUEST_SPACE
+      // TODO(andrew): could this exception message be propagated from the server side?
+      throw new ResourceExhaustedException(ExceptionMessage.CANNOT_REQUEST_SPACE
           .getMessageWithUrl(RuntimeConstants.ALLUXIO_DEBUG_DOCS_URL, mRpcAddress, blockId));
     }
   }
 
   @Override
-  public boolean requestSpace(final long blockId, final long requestBytes) throws IOException {
+  public boolean requestSpace(final long blockId, final long requestBytes) {
     boolean success = retryRPC(
         new RpcCallable<Boolean, BlockWorkerClientService.Client>() {
           @Override
@@ -313,14 +312,14 @@ public final class RetryHandlingBlockWorkerClient
           }
         });
     if (!success) {
-      throw new IOException(ExceptionMessage.CANNOT_REQUEST_SPACE
+      throw new ResourceExhaustedException(ExceptionMessage.CANNOT_REQUEST_SPACE
           .getMessageWithUrl(RuntimeConstants.ALLUXIO_DEBUG_DOCS_URL, mRpcAddress, blockId));
     }
     return true;
   }
 
   @Override
-  public boolean unlockBlock(final long blockId) throws IOException {
+  public boolean unlockBlock(final long blockId) {
     return retryRPC(new RpcCallable<Boolean, BlockWorkerClientService.Client>() {
       @Override
       public Boolean call(BlockWorkerClientService.Client client) throws TException {
@@ -330,23 +329,25 @@ public final class RetryHandlingBlockWorkerClient
   }
 
   /**
-   * sessionHeartbeat is not retried because it is supposed to be called periodically.
-   *
-   * @throws IOException if it fails to heartbeat
    * @throws InterruptedException if heartbeat is interrupted
    */
   @Override
-  public void sessionHeartbeat(RetryPolicy retryPolicy) throws IOException, InterruptedException {
+  public void sessionHeartbeat(RetryPolicy retryPolicy) throws InterruptedException {
     TException exception;
     do {
-      BlockWorkerClientService.Client client = mClientHeartbeatPool.acquire();
+      BlockWorkerClientService.Client client;
+      try {
+        client = mClientHeartbeatPool.acquire();
+      } catch (IOException ioe) {
+        throw new UnknownException(ioe.getMessage(), ioe);
+      }
       try {
         client.sessionHeartbeat(mSessionId, null);
         Metrics.BLOCK_WORKER_HEATBEATS.inc();
         return;
       } catch (AlluxioTException e) {
         LOG.warn(e.getMessage());
-        throw new IOException(AlluxioStatusException.fromThrift(e));
+        throw AlluxioStatusException.fromThrift(e);
       } catch (TException e) {
         client.getOutputProtocol().getTransport().close();
         exception = e;
@@ -356,7 +357,7 @@ public final class RetryHandlingBlockWorkerClient
       }
     } while (retryPolicy.attemptRetry());
     Preconditions.checkNotNull(exception);
-    throw new IOException(exception);
+    throw new UnavailableException(exception);
   }
 
   /**

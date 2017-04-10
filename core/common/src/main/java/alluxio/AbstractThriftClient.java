@@ -12,6 +12,8 @@
 package alluxio;
 
 import alluxio.exception.status.AlluxioStatusException;
+import alluxio.exception.status.UnavailableException;
+import alluxio.exception.status.UnknownException;
 import alluxio.network.connection.ThriftClientPool;
 import alluxio.retry.ExponentialBackoffRetry;
 import alluxio.retry.RetryPolicy;
@@ -75,16 +77,23 @@ public abstract class AbstractThriftClient<C extends AlluxioService.Client> {
    * @param rpc the RPC call to be executed
    * @param <V> type of return value of the RPC call
    * @return the return value of the RPC call
-   * @throws IOException when retries exceeds {@link #RPC_MAX_NUM_RETRY}
+   * @throws UnavailableException when retries exceeds {@link #RPC_MAX_NUM_RETRY}
    */
-  protected <V> V retryRPC(RpcCallable<V, C> rpc) throws IOException {
-    TException exception;
+  protected <V> V retryRPC(RpcCallable<V, C> rpc) {
+    Exception exception;
     RetryPolicy retryPolicy =
         new ExponentialBackoffRetry(BASE_SLEEP_MS, MAX_SLEEP_MS, RPC_MAX_NUM_RETRY);
     do {
-      C client = acquireClient();
+      C client;
+      try {
+        client = acquireClient();
+      } catch (IOException ioe) {
+        throw new UnknownException(ioe);
+      }
       try {
         return rpc.call(client);
+      } catch (UnavailableException e) {
+        exception = e;
       } catch (AlluxioTException e) {
         AlluxioStatusException ase = AlluxioStatusException.fromThrift(e);
         processException(client, ase);
@@ -99,7 +108,7 @@ public abstract class AbstractThriftClient<C extends AlluxioService.Client> {
     } while (retryPolicy.attemptRetry());
     LOG.error("Failed after " + retryPolicy.getRetryCount() + " retries.");
     Preconditions.checkNotNull(exception);
-    throw new IOException(exception);
+    throw new UnavailableException(exception.getMessage(), exception);
   }
 
   /**

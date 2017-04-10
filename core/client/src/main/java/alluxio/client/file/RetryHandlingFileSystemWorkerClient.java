@@ -21,7 +21,6 @@ import alluxio.client.file.options.CompleteUfsFileOptions;
 import alluxio.client.file.options.CreateUfsFileOptions;
 import alluxio.client.file.options.OpenUfsFileOptions;
 import alluxio.exception.AlluxioException;
-import alluxio.exception.status.UnavailableException;
 import alluxio.metrics.MetricsSystem;
 import alluxio.retry.CountingRetry;
 import alluxio.retry.ExponentialBackoffRetry;
@@ -168,18 +167,14 @@ public final class RetryHandlingFileSystemWorkerClient
 
   @Override
   public void cancelUfsFile(final long tempUfsFileId, final CancelUfsFileOptions options) {
-    try {
-      retryRPC(new RpcCallable<Void, FileSystemWorkerClientService.Client>() {
-        @Override
-        public Void call(FileSystemWorkerClientService.Client client)
-            throws TException {
-          client.cancelUfsFile(mSessionId, tempUfsFileId, options.toThrift());
-          return null;
-        }
-      });
-    } catch (IOException e) {
-      throw new UnavailableException(e.getMessage(), e);
-    }
+    retryRPC(new RpcCallable<Void, FileSystemWorkerClientService.Client>() {
+      @Override
+      public Void call(FileSystemWorkerClientService.Client client)
+          throws TException {
+        client.cancelUfsFile(mSessionId, tempUfsFileId, options.toThrift());
+        return null;
+      }
+    });
   }
 
   @Override
