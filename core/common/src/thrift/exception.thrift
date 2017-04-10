@@ -119,7 +119,3 @@ exception AlluxioTException {
   2: string message
   4: TExceptionStatus status
 }
-
-exception ThriftIOException {
-  1: string message
-}
