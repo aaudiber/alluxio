@@ -131,6 +131,12 @@ public enum ExceptionStatus {
   // DataLoss indicates unrecoverable data loss or corruption.
   DATA_LOSS;
 
+  /**
+   * Converts an internal exception status to a Thrift type status.
+   *
+   * @param status the status to convert
+   * @return the Thrift type status
+   */
   public static TExceptionStatus toThrift(ExceptionStatus status) {
     switch (status) {
       case ABORTED:

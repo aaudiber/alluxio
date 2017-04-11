@@ -84,6 +84,9 @@ public class AlluxioStatusException extends RuntimeException {
     return mStatus;
   }
 
+  /**
+   * @return the Thrift representation of this exception
+   */
   public AlluxioTException toThrift() {
     return new AlluxioTException(getMessage(), ExceptionStatus.toThrift(mStatus));
   }

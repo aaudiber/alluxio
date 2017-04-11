@@ -91,8 +91,9 @@ public final class AlluxioBlockStore {
    *
    * @param blockId the blockId to obtain information about
    * @return a {@link BlockInfo} containing the metadata of the block
+   * @throws IOException if the block does not exist
    */
-  public BlockInfo getInfo(long blockId) {
+  public BlockInfo getInfo(long blockId) throws IOException {
     try (CloseableResource<BlockMasterClient> masterClientResource =
         mContext.acquireBlockMasterClientResource()) {
       return masterClientResource.get().getBlockInfo(blockId);
@@ -122,6 +123,7 @@ public final class AlluxioBlockStore {
    * @param blockId the block to read from
    * @param options the options
    * @return an {@link InputStream} which can be used to read the data in a streaming fashion
+   * @throws IOException if the block does not exist
    */
   public BlockInStream getInStream(long blockId, InStreamOptions options)
       throws IOException {
@@ -178,6 +180,7 @@ public final class AlluxioBlockStore {
    * @param options the output stream options
    * @return an {@link BlockOutStream} which can be used to write data to the block in a
    *         streaming fashion
+   * @throws IOException if the block cannot be written
    */
   public BlockOutStream getOutStream(long blockId, long blockSize, WorkerNetAddress address,
       OutStreamOptions options) throws IOException {
@@ -234,7 +237,7 @@ public final class AlluxioBlockStore {
    * @return the capacity in bytes
    * @throws IOException when the connection to the client fails
    */
-  public long getCapacityBytes() throws IOException {
+  public long getCapacityBytes() {
     try (CloseableResource<BlockMasterClient> blockMasterClientResource =
         mContext.acquireBlockMasterClientResource()) {
       return blockMasterClientResource.get().getCapacityBytes();
@@ -267,19 +270,19 @@ public final class AlluxioBlockStore {
     try (CloseableResource<BlockMasterClient> blockMasterClientResource =
         mContext.acquireBlockMasterClientResource()) {
       info = blockMasterClientResource.get().getBlockInfo(blockId);
-    }
-    if (info.getLocations().isEmpty()) {
-      // Nothing to promote
-      return;
-    }
-    // Get the first worker address for now, as this will likely be the location being read from
-    // TODO(calvin): Get this location via a policy (possibly location is a parameter to promote)
-    BlockWorkerClient blockWorkerClient = mContext.createBlockWorkerClient(
-        info.getLocations().get(0).getWorkerAddress(), null  /* no session */);
-    try {
-      blockWorkerClient.promoteBlock(blockId);
-    } finally {
-      blockWorkerClient.close();
+      if (info.getLocations().isEmpty()) {
+        // Nothing to promote
+        return;
+      }
+      // Get the first worker address for now, as this will likely be the location being read from
+      // TODO(calvin): Get this location via a policy (possibly location is a parameter to promote)
+      BlockWorkerClient blockWorkerClient = mContext.createBlockWorkerClient(
+          info.getLocations().get(0).getWorkerAddress(), null  /* no session */);
+      try {
+        blockWorkerClient.promoteBlock(blockId);
+      } finally {
+        blockWorkerClient.close();
+      }
     }
   }
 
