@@ -23,7 +23,6 @@ import alluxio.client.file.options.CompleteFileOptions;
 import alluxio.client.file.options.CompleteUfsFileOptions;
 import alluxio.client.file.options.CreateUfsFileOptions;
 import alluxio.client.file.options.OutStreamOptions;
-import alluxio.exception.AlluxioException;
 import alluxio.exception.ExceptionMessage;
 import alluxio.exception.PreconditionMessage;
 import alluxio.metrics.MetricsSystem;
@@ -31,7 +30,6 @@ import alluxio.resource.CloseableResource;
 
 import com.codahale.metrics.Counter;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Throwables;
 import com.google.common.io.Closer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -134,10 +132,9 @@ public class FileOutStream extends AbstractOutStream {
         mUnderStorageOutputStream = mCloser.register(mUnderOutStreamFactory
             .create(mContext, mFileSystemWorkerClient.getWorkerDataServerAddress(), mUfsFileId));
       }
-    } catch (AlluxioException | IOException e) {
+    } catch (IOException e) {
       mCloser.close();
-      Throwables.propagateIfInstanceOf(e, IOException.class);
-      throw new IOException(e);
+      throw e;
     }
   }
 
@@ -193,8 +190,6 @@ public class FileOutStream extends AbstractOutStream {
       if (mUnderStorageType.isAsyncPersist()) {
         scheduleAsyncPersist();
       }
-    } catch (AlluxioException e) {
-      throw mCloser.rethrow(new IOException(e));
     } catch (Throwable e) { // must catch Throwable
       throw mCloser.rethrow(e); // IOException will be thrown as-is
     } finally {

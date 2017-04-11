@@ -20,7 +20,8 @@ import alluxio.client.file.options.CloseUfsFileOptions;
 import alluxio.client.file.options.CompleteUfsFileOptions;
 import alluxio.client.file.options.CreateUfsFileOptions;
 import alluxio.client.file.options.OpenUfsFileOptions;
-import alluxio.exception.AlluxioException;
+import alluxio.exception.status.UnavailableException;
+import alluxio.exception.status.UnknownException;
 import alluxio.metrics.MetricsSystem;
 import alluxio.retry.CountingRetry;
 import alluxio.retry.ExponentialBackoffRetry;
@@ -178,8 +179,7 @@ public final class RetryHandlingFileSystemWorkerClient
   }
 
   @Override
-  public void closeUfsFile(final long tempUfsFileId, final CloseUfsFileOptions options)
-      throws AlluxioException, IOException {
+  public void closeUfsFile(final long tempUfsFileId, final CloseUfsFileOptions options) {
     retryRPC(new RpcCallable<Void, FileSystemWorkerClientService.Client>() {
       @Override
       public Void call(FileSystemWorkerClientService.Client client)
@@ -191,8 +191,7 @@ public final class RetryHandlingFileSystemWorkerClient
   }
 
   @Override
-  public long completeUfsFile(final long tempUfsFileId, final CompleteUfsFileOptions options)
-      throws AlluxioException, IOException {
+  public long completeUfsFile(final long tempUfsFileId, final CompleteUfsFileOptions options) {
     return retryRPC(
         new RpcCallable<Long, FileSystemWorkerClientService.Client>() {
           @Override
@@ -204,8 +203,7 @@ public final class RetryHandlingFileSystemWorkerClient
   }
 
   @Override
-  public long createUfsFile(final AlluxioURI path, final CreateUfsFileOptions options)
-      throws AlluxioException, IOException {
+  public long createUfsFile(final AlluxioURI path, final CreateUfsFileOptions options) {
     return retryRPC(
         new RpcCallable<Long, FileSystemWorkerClientService.Client>() {
           @Override
@@ -222,8 +220,7 @@ public final class RetryHandlingFileSystemWorkerClient
   }
 
   @Override
-  public long openUfsFile(final AlluxioURI path, final OpenUfsFileOptions options)
-      throws AlluxioException, IOException {
+  public long openUfsFile(final AlluxioURI path, final OpenUfsFileOptions options) {
     return retryRPC(
         new RpcCallable<Long, FileSystemWorkerClientService.Client>() {
           @Override
@@ -235,10 +232,15 @@ public final class RetryHandlingFileSystemWorkerClient
   }
 
   @Override
-  public void sessionHeartbeat(RetryPolicy retryPolicy) throws IOException, InterruptedException {
+  public void sessionHeartbeat(RetryPolicy retryPolicy) throws InterruptedException {
     TException exception;
     do {
-      FileSystemWorkerClientService.Client client = mClientHeartbeatPool.acquire();
+      FileSystemWorkerClientService.Client client;
+      try {
+        client = mClientHeartbeatPool.acquire();
+      } catch (IOException ioe) {
+        throw new UnknownException(ioe);
+      }
       try {
         client.sessionHeartbeat(mSessionId, null);
         Metrics.FILE_SYSTEM_WORKER_HEARTBEATS.inc();
@@ -255,7 +257,7 @@ public final class RetryHandlingFileSystemWorkerClient
       }
     } while (retryPolicy.attemptRetry());
     Preconditions.checkNotNull(exception);
-    throw new IOException(exception);
+    throw new UnavailableException(exception);
   }
 
   /**

@@ -17,7 +17,6 @@ import alluxio.client.file.options.CloseUfsFileOptions;
 import alluxio.client.file.options.CompleteUfsFileOptions;
 import alluxio.client.file.options.CreateUfsFileOptions;
 import alluxio.client.file.options.OpenUfsFileOptions;
-import alluxio.exception.AlluxioException;
 import alluxio.retry.RetryPolicy;
 import alluxio.wire.WorkerNetAddress;
 
@@ -61,11 +60,8 @@ public interface FileSystemWorkerClient extends Closeable {
    *
    * @param tempUfsFileId the worker specific id of the file to cancel
    * @param options method options
-   * @throws AlluxioException if an error occurs in the internals of the Alluxio worker
-   * @throws IOException if an error occurs interacting with the UFS
    */
-  void cancelUfsFile(final long tempUfsFileId, final CancelUfsFileOptions options)
-      throws AlluxioException, IOException;
+  void cancelUfsFile(final long tempUfsFileId, final CancelUfsFileOptions options);
 
   /**
    * Closes the file currently being written with the specified id. This file must have also
@@ -73,11 +69,8 @@ public interface FileSystemWorkerClient extends Closeable {
    *
    * @param tempUfsFileId the worker specific id of the file to close
    * @param options method options
-   * @throws AlluxioException if an error occurs in the internals of the Alluxio worker
-   * @throws IOException if an error occurs interacting with the UFS
    */
-  void closeUfsFile(final long tempUfsFileId, final CloseUfsFileOptions options)
-      throws AlluxioException, IOException;
+  void closeUfsFile(final long tempUfsFileId, final CloseUfsFileOptions options);
 
   /**
    * Completes the file currently being written with the specified id. This file must have also
@@ -86,11 +79,8 @@ public interface FileSystemWorkerClient extends Closeable {
    * @param tempUfsFileId the worker specific id of the file to complete
    * @param options method options
    * @return the file size of the completed file
-   * @throws AlluxioException if an error occurs in the internals of the Alluxio worker
-   * @throws IOException if an error occurs interacting with the UFS
    */
-  long completeUfsFile(final long tempUfsFileId, final CompleteUfsFileOptions options)
-      throws AlluxioException, IOException;
+  long completeUfsFile(final long tempUfsFileId, final CompleteUfsFileOptions options);
 
   /**
    * Creates a new file in the UFS with the given path.
@@ -98,11 +88,8 @@ public interface FileSystemWorkerClient extends Closeable {
    * @param path the path in the UFS to create, must not already exist
    * @param options method options
    * @return the worker specific file id to reference the created file
-   * @throws AlluxioException if an error occurs in the internals of the Alluxio worker
-   * @throws IOException if an error occurs interacting with the UFS
    */
-  long createUfsFile(final AlluxioURI path, final CreateUfsFileOptions options)
-      throws AlluxioException, IOException;
+  long createUfsFile(final AlluxioURI path, final CreateUfsFileOptions options);
 
   /**
    * @return the data server address of the worker this client is connected to
@@ -115,18 +102,14 @@ public interface FileSystemWorkerClient extends Closeable {
    * @param path the path in the UFS to open, must exist
    * @param options method options
    * @return the worker specific file id to reference the opened file
-   * @throws AlluxioException if an error occurs in the internals of the Alluxio worker
-   * @throws IOException if an error occurs interacting with the UFS
    */
-  long openUfsFile(final AlluxioURI path, final OpenUfsFileOptions options)
-      throws AlluxioException, IOException;
+  long openUfsFile(final AlluxioURI path, final OpenUfsFileOptions options);
   /**
    * Sends a session heartbeat to the worker. This renews the client's lease on resources such as
    * temporary files.
    *
    * @param retryPolicy the retry policy to use
-   * @throws IOException if an I/O error occurs
    * @throws InterruptedException if this thread is interrupted
    */
-  void sessionHeartbeat(RetryPolicy retryPolicy) throws IOException, InterruptedException;
+  void sessionHeartbeat(RetryPolicy retryPolicy) throws InterruptedException;
 }
