@@ -196,7 +196,7 @@ public final class BlockWorkerClientServiceHandler implements BlockWorkerClientS
   public boolean promoteBlock(final long blockId) throws AlluxioTException {
     return RpcUtils.callAndLog(LOG, new RpcCallable<Boolean>() {
       @Override
-      public Boolean call() throws AlluxioException, IOException {
+      public Boolean call() throws AlluxioException {
         // TODO(calvin): Make the top level configurable.
         mWorker.moveBlock(Sessions.MIGRATE_DATA_SESSION_ID, blockId, mStorageTierAssoc.getAlias(0));
         return true;
@@ -322,7 +322,7 @@ public final class BlockWorkerClientServiceHandler implements BlockWorkerClientS
       throws AlluxioTException {
     return RpcUtils.callAndLog(LOG, new RpcCallable<Boolean>() {
       @Override
-      public Boolean call() throws AlluxioException, IOException {
+      public Boolean call() throws AlluxioException {
         if (!mWorker.unlockBlock(sessionId, blockId)) {
           mWorker.closeUfsBlock(sessionId, blockId);
         }

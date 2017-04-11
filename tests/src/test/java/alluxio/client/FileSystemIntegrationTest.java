@@ -24,6 +24,7 @@ import alluxio.exception.ExceptionMessage;
 import alluxio.exception.FileAlreadyExistsException;
 import alluxio.exception.FileDoesNotExistException;
 import alluxio.exception.InvalidPathException;
+import alluxio.exception.status.FailedPreconditionException;
 import alluxio.master.LocalAlluxioCluster;
 import alluxio.util.UnderFileSystemUtils;
 import alluxio.util.io.PathUtils;
@@ -237,7 +238,7 @@ public final class FileSystemIntegrationTest {
     try {
       mFileSystem.mount(new AlluxioURI("/dir"), new AlluxioURI(ufsSubdir));
       Assert.fail("Cannot remount primary ufs.");
-    } catch (InvalidPathException e) {
+    } catch (FailedPreconditionException e) {
       // Exception expected
     }
 
@@ -251,14 +252,14 @@ public final class FileSystemIntegrationTest {
       try {
         mFileSystem.mount(new AlluxioURI("/inner"), new AlluxioURI(innerDirPath));
         Assert.fail("Cannot mount suffix of already-mounted directory");
-      } catch (InvalidPathException e) {
+      } catch (FailedPreconditionException e) {
         // Exception expected, continue
       }
       // Cannot mount prefix of already-mounted directory
       try {
         mFileSystem.mount(new AlluxioURI("/root"), new AlluxioURI(alternateUfsRoot));
         Assert.fail("Cannot mount prefix of already-mounted directory");
-      } catch (InvalidPathException e) {
+      } catch (FailedPreconditionException e) {
         // Exception expected, continue
       }
     } finally {

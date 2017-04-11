@@ -16,6 +16,7 @@ import alluxio.exception.AccessControlException;
 import alluxio.exception.ExceptionMessage;
 import alluxio.exception.FileAlreadyExistsException;
 import alluxio.exception.InvalidPathException;
+import alluxio.exception.status.FailedPreconditionException;
 import alluxio.master.file.meta.options.MountInfo;
 import alluxio.master.file.options.MountOptions;
 import alluxio.master.journal.JournalCheckpointStreamable;
@@ -126,8 +127,8 @@ public final class MountTable implements JournalCheckpointStreamable {
         AlluxioURI mountedUfsUri = entry.getValue().getUfsUri();
         if (!mountedAlluxioPath.equals(ROOT)
             && PathUtils.hasPrefix(alluxioPath, mountedAlluxioPath)) {
-          throw new InvalidPathException(ExceptionMessage.MOUNT_POINT_PREFIX_OF_ANOTHER.getMessage(
-              mountedAlluxioPath, alluxioPath));
+          throw new FailedPreconditionException(ExceptionMessage.MOUNT_POINT_PREFIX_OF_ANOTHER
+              .getMessage(mountedAlluxioPath, alluxioPath));
         }
         if ((ufsUri.getScheme() == null || ufsUri.getScheme().equals(mountedUfsUri.getScheme()))
             && (ufsUri.getAuthority() == null || ufsUri.getAuthority()
@@ -135,11 +136,11 @@ public final class MountTable implements JournalCheckpointStreamable {
           String ufsPath = ufsUri.getPath();
           String mountedUfsPath = mountedUfsUri.getPath();
           if (PathUtils.hasPrefix(ufsPath, mountedUfsPath)) {
-            throw new InvalidPathException(ExceptionMessage.MOUNT_POINT_PREFIX_OF_ANOTHER
+            throw new FailedPreconditionException(ExceptionMessage.MOUNT_POINT_PREFIX_OF_ANOTHER
                 .getMessage(mountedUfsUri.toString(), ufsUri.toString()));
           }
           if (PathUtils.hasPrefix(mountedUfsPath, ufsPath)) {
-            throw new InvalidPathException(ExceptionMessage.MOUNT_POINT_PREFIX_OF_ANOTHER
+            throw new FailedPreconditionException(ExceptionMessage.MOUNT_POINT_PREFIX_OF_ANOTHER
                 .getMessage(ufsUri.toString(), mountedUfsUri.toString()));
           }
         }

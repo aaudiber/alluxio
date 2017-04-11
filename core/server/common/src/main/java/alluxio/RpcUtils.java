@@ -74,7 +74,7 @@ public final class RpcUtils {
     } catch (AlluxioException e) {
       throw handleAlluxioStatusException(logger, callable, convertAlluxioException(e));
     } catch (Exception e) {
-      throw new UnknownException(e);
+      throw new UnknownException(e).toThrift();
     }
   }
 
@@ -140,15 +140,19 @@ public final class RpcUtils {
       throw ae;
     } catch (AccessControlException e) {
       return new PermissionDeniedException(e);
-    } catch (BlockAlreadyExistsException | FileAlreadyCompletedException | FileAlreadyExistsException e) {
+    } catch (BlockAlreadyExistsException | FileAlreadyCompletedException
+        | FileAlreadyExistsException e) {
       return new AlreadyExistsException(e);
-    } catch (BlockDoesNotExistException | FileDoesNotExistException | LineageDoesNotExistException e) {
+    } catch (BlockDoesNotExistException | FileDoesNotExistException
+        | LineageDoesNotExistException e) {
       return new NotFoundException(e);
     } catch (BlockInfoException | InvalidFileSizeException | InvalidPathException e) {
       return new InvalidArgumentException(e);
-    } catch (ConnectionFailedException | FailedToCheckpointException | NoWorkerException | UfsBlockAccessTokenUnavailableException e) {
+    } catch (ConnectionFailedException | FailedToCheckpointException | NoWorkerException
+        | UfsBlockAccessTokenUnavailableException e) {
       return new UnavailableException(e);
-    } catch (DependencyDoesNotExistException | DirectoryNotEmptyException | InvalidWorkerStateException | LineageDeletionException e) {
+    } catch (DependencyDoesNotExistException | DirectoryNotEmptyException
+        | InvalidWorkerStateException | LineageDeletionException e) {
       return new FailedPreconditionException(e);
     } catch (WorkerOutOfSpaceException e) {
       return new ResourceExhaustedException(e);
@@ -188,9 +192,9 @@ public final class RpcUtils {
      * The RPC implementation.
      *
      * @return the return value from the RPC
-     * @throws Exception if an exception occurs
+     * @throws AlluxioException if a checked Alluxio exception occurs
      */
-    T call() throws Exception;
+    T call() throws AlluxioException;
   }
 
   private RpcUtils() {} // prevent instantiation
