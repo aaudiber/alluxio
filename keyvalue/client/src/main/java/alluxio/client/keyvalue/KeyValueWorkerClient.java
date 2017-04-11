@@ -13,16 +13,13 @@ package alluxio.client.keyvalue;
 
 import alluxio.AbstractClient;
 import alluxio.Constants;
-import alluxio.exception.AlluxioException;
 import alluxio.thrift.AlluxioService;
-import alluxio.thrift.AlluxioTException;
 import alluxio.thrift.KeyValueWorkerClientService;
 import alluxio.util.network.NetworkAddressUtils;
 import alluxio.wire.WorkerNetAddress;
 
 import org.apache.thrift.TException;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
 
@@ -63,7 +60,7 @@ public final class KeyValueWorkerClient extends AbstractClient {
   }
 
   @Override
-  protected void afterConnect() throws IOException {
+  protected void afterConnect() {
     mClient = new KeyValueWorkerClientService.Client(mProtocol);
   }
 
@@ -73,14 +70,11 @@ public final class KeyValueWorkerClient extends AbstractClient {
    * @param blockId The id of the block
    * @param key the key to get the value for
    * @return ByteBuffer of value, or null if not found
-   * @throws IOException if an I/O error occurs
-   * @throws AlluxioException if an Alluxio error occurs
    */
-  public synchronized ByteBuffer get(final long blockId, final ByteBuffer key)
-      throws IOException, AlluxioException {
+  public synchronized ByteBuffer get(final long blockId, final ByteBuffer key) {
     return retryRPC(new RpcCallable<ByteBuffer>() {
       @Override
-      public ByteBuffer call() throws AlluxioTException, TException {
+      public ByteBuffer call() throws TException {
         return mClient.get(blockId, key);
       }
     });
@@ -96,14 +90,12 @@ public final class KeyValueWorkerClient extends AbstractClient {
    * @param key the current key
    * @param numKeys maximum number of next keys to fetch
    * @return the next batch of keys
-   * @throws IOException if an I/O error occurs
-   * @throws AlluxioException if an Alluxio error occurs
    */
   public synchronized List<ByteBuffer> getNextKeys(final long blockId, final ByteBuffer key,
-      final int numKeys) throws IOException, AlluxioException {
+      final int numKeys) {
     return retryRPC(new RpcCallable<List<ByteBuffer>>() {
       @Override
-      public List<ByteBuffer> call() throws AlluxioTException, TException {
+      public List<ByteBuffer> call() throws TException {
         return mClient.getNextKeys(blockId, key, numKeys);
       }
     });
@@ -112,13 +104,11 @@ public final class KeyValueWorkerClient extends AbstractClient {
   /**
    * @param blockId the id of the partition
    * @return the number of key-value pairs in the partition
-   * @throws IOException if a non-Alluxio related exception occurs
-   * @throws AlluxioException if an exception in Alluxio occurs
    */
-  public synchronized int getSize(final long blockId) throws IOException, AlluxioException {
+  public synchronized int getSize(final long blockId) {
     return retryRPC(new RpcCallable<Integer>() {
       @Override
-      public Integer call() throws AlluxioTException, TException {
+      public Integer call() throws TException {
         return mClient.getSize(blockId);
       }
     });
