@@ -16,7 +16,6 @@ import alluxio.PropertyKey;
 import alluxio.Sessions;
 import alluxio.StorageTierAssoc;
 import alluxio.WorkerStorageTierAssoc;
-import alluxio.exception.AlluxioException;
 import alluxio.exception.BlockDoesNotExistException;
 import alluxio.exception.ConnectionFailedException;
 import alluxio.exception.InvalidWorkerStateException;
@@ -124,12 +123,9 @@ public final class BlockMasterSync implements HeartbeatExecutor {
       mMasterClient.register(mWorkerId.get(),
           storageTierAssoc.getOrderedStorageAliases(), storeMeta.getCapacityBytesOnTiers(),
           storeMeta.getUsedBytesOnTiers(), storeMeta.getBlockList());
-    } catch (IOException e) {
+    } catch (Exception e) {
       LOG.error("Failed to register with master.", e);
       throw e;
-    } catch (AlluxioException e) {
-      LOG.error("Failed to register with master.", e);
-      throw new IOException(e);
     }
   }
 

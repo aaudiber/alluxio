@@ -13,9 +13,6 @@ package alluxio;
 
 import alluxio.exception.AlluxioException;
 import alluxio.exception.status.AlluxioStatusException;
-import alluxio.exception.status.DataLossException;
-import alluxio.exception.status.InternalException;
-import alluxio.exception.status.ResourceExhaustedException;
 import alluxio.exception.status.UnknownException;
 import alluxio.thrift.AlluxioTException;
 
@@ -60,22 +57,22 @@ public final class RpcUtils {
    *
    * @param logger the logger to use for this call
    * @param callable the callable to call
-   * @param ase an {@link AlluxioStatusException}
+   * @param e an {@link AlluxioStatusException}
    * @return the corresponding AlluxioTException
    */
-  public static <T> AlluxioTException handleAlluxioStatusException(Logger logger,
-      RpcCallable<T> callable, AlluxioStatusException ase) throws AlluxioTException {
-    try {
-      throw ase;
-    } catch (InternalException | DataLossException e) {
-      logger.error("{}", callable, e);
-      throw e.toThrift();
-    } catch (ResourceExhaustedException e) {
-      logger.warn("{}", callable, e);
-      throw e.toThrift();
-    } catch (AlluxioStatusException e) {
-      logger.debug("{}, Error={}", callable, e.getMessage());
-      throw e.toThrift();
+  public static AlluxioTException handleAlluxioStatusException(Logger logger,
+      RpcCallable<?> callable, AlluxioStatusException e) {
+    switch (e.getStatus()) {
+      case INTERNAL:
+      case DATA_LOSS:
+        logger.error("{}", callable, e);
+        return e.toThrift();
+      case RESOURCE_EXHAUSTED:
+        logger.warn("{}", callable, e);
+        return e.toThrift();
+      default:
+        logger.debug("{}, Error={}", callable, e.getMessage());
+        return e.toThrift();
     }
   }
 

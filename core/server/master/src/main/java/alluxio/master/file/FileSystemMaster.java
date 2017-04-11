@@ -2084,11 +2084,6 @@ public final class FileSystemMaster extends AbstractMaster {
     }
   }
 
-  // TODO(binfan): throw a better exception rather than UnexpectedAlluxioException. Currently
-  // UnexpectedAlluxioException is thrown because we want to keep backwards compatibility with
-  // clients of earlier versions prior to 1.5. If a new exception is added, it will be converted
-  // into RuntimeException on the client.
-
   /**
    * Frees or evicts all of the blocks of the file from alluxio storage. If the given file is a
    * directory, and the 'recursive' flag is enabled, all descendant files will also be freed.
@@ -2100,7 +2095,6 @@ public final class FileSystemMaster extends AbstractMaster {
    * @throws FileDoesNotExistException if the file does not exist
    * @throws AccessControlException if permission checking fails
    * @throws InvalidPathException if the given path is invalid
-   * @throws UnexpectedAlluxioException if the file or directory can not be freed
    */
   public void free(AlluxioURI path, FreeOptions options)
       throws FileDoesNotExistException, InvalidPathException, AccessControlException {
@@ -2123,7 +2117,6 @@ public final class FileSystemMaster extends AbstractMaster {
    * @throws FileDoesNotExistException if the file does not exist
    * @throws AccessControlException if permission checking fails
    * @throws InvalidPathException if the given path is invalid
-   * @throws UnexpectedAlluxioException if the file or directory can not be freed
    */
   private void freeAndJournal(LockedInodePath inodePath, FreeOptions options,
       JournalContext journalContext)
