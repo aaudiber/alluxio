@@ -11,45 +11,17 @@
 
 package alluxio;
 
-import alluxio.exception.AccessControlException;
 import alluxio.exception.AlluxioException;
-import alluxio.exception.BlockAlreadyExistsException;
-import alluxio.exception.BlockDoesNotExistException;
-import alluxio.exception.BlockInfoException;
-import alluxio.exception.ConnectionFailedException;
-import alluxio.exception.DependencyDoesNotExistException;
-import alluxio.exception.DirectoryNotEmptyException;
-import alluxio.exception.FailedToCheckpointException;
-import alluxio.exception.FileAlreadyCompletedException;
-import alluxio.exception.FileAlreadyExistsException;
-import alluxio.exception.FileDoesNotExistException;
-import alluxio.exception.InvalidFileSizeException;
-import alluxio.exception.InvalidPathException;
-import alluxio.exception.InvalidWorkerStateException;
-import alluxio.exception.LineageDeletionException;
-import alluxio.exception.LineageDoesNotExistException;
-import alluxio.exception.NoWorkerException;
-import alluxio.exception.UfsBlockAccessTokenUnavailableException;
-import alluxio.exception.WorkerOutOfSpaceException;
 import alluxio.exception.status.AlluxioStatusException;
-import alluxio.exception.status.AlreadyExistsException;
 import alluxio.exception.status.DataLossException;
-import alluxio.exception.status.FailedPreconditionException;
 import alluxio.exception.status.InternalException;
-import alluxio.exception.status.InvalidArgumentException;
-import alluxio.exception.status.NotFoundException;
-import alluxio.exception.status.OutOfRangeException;
-import alluxio.exception.status.PermissionDeniedException;
 import alluxio.exception.status.ResourceExhaustedException;
-import alluxio.exception.status.UnavailableException;
 import alluxio.exception.status.UnknownException;
 import alluxio.thrift.AlluxioTException;
 
 import org.slf4j.Logger;
 
-import java.util.ConcurrentModificationException;
-import java.util.NoSuchElementException;
-import java.util.concurrent.RejectedExecutionException;
+import java.io.IOException;
 
 /**
  * Utilities for handling RPC calls.
@@ -65,17 +37,21 @@ public final class RpcUtils {
    * @throws AlluxioTException if the callable throws an exception
    */
   public static <T> T call(Logger logger, RpcCallable<T> callable) throws AlluxioTException {
+    AlluxioStatusException ase;
     try {
       return callable.call();
     } catch (AlluxioStatusException e) {
-      throw handleAlluxioStatusException(logger, callable, e);
+      ase = e;
     } catch (RuntimeException e) {
-      throw handleAlluxioStatusException(logger, callable, convertRuntimeException(e));
+      ase = AlluxioStatusException.fromRuntimeException(e);
     } catch (AlluxioException e) {
-      throw handleAlluxioStatusException(logger, callable, convertAlluxioException(e));
+      ase = AlluxioStatusException.fromAlluxioException(e);
+    } catch (IOException e) {
+      ase = AlluxioStatusException.fromIOException(e);
     } catch (Exception e) {
-      throw new UnknownException(e).toThrift();
+      ase = new UnknownException(e);
     }
+    throw handleAlluxioStatusException(logger, callable, ase);
   }
 
   /**
@@ -100,64 +76,6 @@ public final class RpcUtils {
     } catch (AlluxioStatusException e) {
       logger.debug("{}, Error={}", callable, e.getMessage());
       throw e.toThrift();
-    }
-  }
-
-  /**
-   * Converts runtime exceptions to Alluxio status exceptions. Well-known runtime exceptions are
-   * converted intelligently. Unrecognized runtime exceptions are converted to
-   * {@link UnknownException}.
-   *
-   * @param re the runtime exception to convert
-   * @return the converted {@link AlluxioStatusException}
-   */
-  public static AlluxioStatusException convertRuntimeException(RuntimeException re) {
-    try {
-      throw re;
-    } catch (ArithmeticException | ClassCastException | ConcurrentModificationException
-        | IllegalStateException | NoSuchElementException | NullPointerException
-        | UnsupportedOperationException e) {
-      return new InternalException(e);
-    } catch (IllegalArgumentException e) {
-      return new InvalidArgumentException(e);
-    } catch (IndexOutOfBoundsException e) {
-      return new OutOfRangeException(e);
-    } catch (RejectedExecutionException e) {
-      return new ResourceExhaustedException(e);
-    } catch (RuntimeException e) {
-      return new UnknownException(e);
-    }
-  }
-
-  /**
-   * Converts checked Alluxio exceptions to Alluxio status exceptions.
-   *
-   * @param ae the Alluxio exception to convert
-   * @return the converted {@link AlluxioStatusException}
-   */
-  public static AlluxioStatusException convertAlluxioException(AlluxioException ae) {
-    try {
-      throw ae;
-    } catch (AccessControlException e) {
-      return new PermissionDeniedException(e);
-    } catch (BlockAlreadyExistsException | FileAlreadyCompletedException
-        | FileAlreadyExistsException e) {
-      return new AlreadyExistsException(e);
-    } catch (BlockDoesNotExistException | FileDoesNotExistException
-        | LineageDoesNotExistException e) {
-      return new NotFoundException(e);
-    } catch (BlockInfoException | InvalidFileSizeException | InvalidPathException e) {
-      return new InvalidArgumentException(e);
-    } catch (ConnectionFailedException | FailedToCheckpointException | NoWorkerException
-        | UfsBlockAccessTokenUnavailableException e) {
-      return new UnavailableException(e);
-    } catch (DependencyDoesNotExistException | DirectoryNotEmptyException
-        | InvalidWorkerStateException | LineageDeletionException e) {
-      return new FailedPreconditionException(e);
-    } catch (WorkerOutOfSpaceException e) {
-      return new ResourceExhaustedException(e);
-    } catch (AlluxioException e) {
-      return new UnknownException(e);
     }
   }
 
@@ -193,8 +111,9 @@ public final class RpcUtils {
      *
      * @return the return value from the RPC
      * @throws AlluxioException if a checked Alluxio exception occurs
+     * @throws IOException if an I/O exception occurs
      */
-    T call() throws AlluxioException;
+    T call() throws AlluxioException, IOException;
   }
 
   private RpcUtils() {} // prevent instantiation

@@ -196,7 +196,7 @@ public final class BlockWorkerClientServiceHandler implements BlockWorkerClientS
   public boolean promoteBlock(final long blockId) throws AlluxioTException {
     return RpcUtils.callAndLog(LOG, new RpcCallable<Boolean>() {
       @Override
-      public Boolean call() throws AlluxioException {
+      public Boolean call() throws AlluxioException, IOException {
         // TODO(calvin): Make the top level configurable.
         mWorker.moveBlock(Sessions.MIGRATE_DATA_SESSION_ID, blockId, mStorageTierAssoc.getAlias(0));
         return true;
@@ -273,6 +273,7 @@ public final class BlockWorkerClientServiceHandler implements BlockWorkerClientS
    * @return true if the worker successfully allocates space for the block on block’s location,
    *         false if there is not enough space
    * @throws AlluxioTException if an exception occurs
+   * @throws IOException if an IO exception occurs
    */
   @Override
   public boolean requestSpace(final long sessionId, final long blockId, final long requestBytes)
@@ -315,6 +316,7 @@ public final class BlockWorkerClientServiceHandler implements BlockWorkerClientS
    * @return true if successfully unlock the block, return false if the block is not
    * found or failed to delete the block
    * @throws AlluxioTException if an exception occurs
+   * @throws IOException if an IO exception occurs
    */
   // TODO(andrew): This should return void
   @Override
@@ -322,7 +324,7 @@ public final class BlockWorkerClientServiceHandler implements BlockWorkerClientS
       throws AlluxioTException {
     return RpcUtils.callAndLog(LOG, new RpcCallable<Boolean>() {
       @Override
-      public Boolean call() throws AlluxioException {
+      public Boolean call() throws AlluxioException, IOException {
         if (!mWorker.unlockBlock(sessionId, blockId)) {
           mWorker.closeUfsBlock(sessionId, blockId);
         }
