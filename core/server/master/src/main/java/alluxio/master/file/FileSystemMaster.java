@@ -30,6 +30,7 @@ import alluxio.exception.InvalidFileSizeException;
 import alluxio.exception.InvalidPathException;
 import alluxio.exception.PreconditionMessage;
 import alluxio.exception.status.FailedPreconditionException;
+import alluxio.exception.status.NotFoundException;
 import alluxio.heartbeat.HeartbeatContext;
 import alluxio.heartbeat.HeartbeatExecutor;
 import alluxio.heartbeat.HeartbeatThread;
@@ -2588,7 +2589,7 @@ public final class FileSystemMaster extends AbstractMaster {
       UnderFileSystem ufs = UnderFileSystem.Factory.get(ufsPath.toString());
       ufs.setProperties(options.getProperties());
       if (!ufs.isDirectory(ufsPath.toString())) {
-        throw new IOException(
+        throw new NotFoundException(
             ExceptionMessage.UFS_PATH_DOES_NOT_EXIST.getMessage(ufsPath.getPath()));
       }
       // Check that the alluxioPath we're creating doesn't shadow a path in the default UFS
@@ -2596,7 +2597,7 @@ public final class FileSystemMaster extends AbstractMaster {
       UnderFileSystem defaultUfs = UnderFileSystem.Factory.get(defaultUfsPath);
       String shadowPath = PathUtils.concatPath(defaultUfsPath, alluxioPath.getPath());
       if (defaultUfs.exists(shadowPath)) {
-        throw new IOException(
+        throw new FailedPreconditionException(
             ExceptionMessage.MOUNT_PATH_SHADOWS_DEFAULT_UFS.getMessage(alluxioPath));
       }
 

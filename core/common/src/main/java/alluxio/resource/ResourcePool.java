@@ -38,6 +38,7 @@ public abstract class ResourcePool<T> {
   protected final ConcurrentLinkedQueue<T> mResources;
   protected final AtomicInteger mCurrentCapacity;
 
+
   /**
    * Creates a {@link ResourcePool} instance with the specified capacity.
    *

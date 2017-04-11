@@ -18,7 +18,7 @@ import alluxio.client.file.FileSystemContext;
 import alluxio.client.file.FileSystemMasterClient;
 import alluxio.client.file.URIStatus;
 import alluxio.client.file.options.CreateFileOptions;
-import alluxio.exception.LineageDoesNotExistException;
+import alluxio.exception.status.NotFoundException;
 import alluxio.wire.FileInfo;
 import alluxio.wire.TtlAction;
 
@@ -105,11 +105,10 @@ public final class LineageFileSystemTest {
   public void getNonLineageStream() throws Exception {
     AlluxioURI path = new AlluxioURI("test");
     Mockito
-        .when(mLineageMasterClient.reinitializeFile("test", TEST_BLOCK_SIZE, 0,
-            TtlAction.DELETE))
-        .thenThrow(new LineageDoesNotExistException("lineage does not exist"));
-    CreateFileOptions options = CreateFileOptions.defaults().setBlockSizeBytes(TEST_BLOCK_SIZE)
-        .setTtl(0);
+        .when(mLineageMasterClient.reinitializeFile("test", TEST_BLOCK_SIZE, 0, TtlAction.DELETE))
+        .thenThrow(new NotFoundException("lineage does not exist"));
+    CreateFileOptions options =
+        CreateFileOptions.defaults().setBlockSizeBytes(TEST_BLOCK_SIZE).setTtl(0);
     FileOutStream outStream = mAlluxioLineageFileSystem.createFile(path, options);
     Assert.assertTrue(outStream != null);
     Assert.assertFalse(outStream instanceof LineageFileOutStream);

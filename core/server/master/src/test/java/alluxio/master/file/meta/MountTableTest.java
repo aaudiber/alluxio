@@ -15,7 +15,7 @@ import alluxio.AlluxioURI;
 import alluxio.exception.AccessControlException;
 import alluxio.exception.ExceptionMessage;
 import alluxio.exception.FileAlreadyExistsException;
-import alluxio.exception.InvalidPathException;
+import alluxio.exception.status.FailedPreconditionException;
 import alluxio.master.file.meta.options.MountInfo;
 import alluxio.master.file.options.MountOptions;
 
@@ -61,7 +61,7 @@ public final class MountTableTest {
 
     try {
       mMountTable.add(new AlluxioURI("/mnt/bar/baz"), new AlluxioURI("/baz"), mDefaultOptions);
-    } catch (InvalidPathException e) {
+    } catch (FailedPreconditionException e) {
       // Exception expected
       Assert.assertEquals(
           ExceptionMessage.MOUNT_POINT_PREFIX_OF_ANOTHER.getMessage("/mnt/bar", "/mnt/bar/baz"),
@@ -131,7 +131,7 @@ public final class MountTableTest {
     try {
       mMountTable.add(new AlluxioURI("alluxio://localhost:1234/mnt/bar/baz"),
           new AlluxioURI("hdfs://localhost:5678/baz"), mDefaultOptions);
-    } catch (InvalidPathException e) {
+    } catch (FailedPreconditionException e) {
       Assert.assertEquals(
           ExceptionMessage.MOUNT_POINT_PREFIX_OF_ANOTHER.getMessage("/mnt/bar", "/mnt/bar/baz"),
           e.getMessage());

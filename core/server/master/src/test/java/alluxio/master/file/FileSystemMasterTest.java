@@ -1387,7 +1387,7 @@ public final class FileSystemMasterTest {
     mFileSystemMaster.mount(alluxioURI, ufsURI, MountOptions.defaults());
     AlluxioURI shadowAlluxioURI = new AlluxioURI("/hello/shadow");
     AlluxioURI anotherUfsURI = createTempUfsDir("ufs/hi");
-    mThrown.expect(InvalidPathException.class);
+    mThrown.expect(FailedPreconditionException.class);
     mFileSystemMaster.mount(shadowAlluxioURI, anotherUfsURI, MountOptions.defaults());
   }
 
@@ -1401,7 +1401,7 @@ public final class FileSystemMasterTest {
     mFileSystemMaster.mount(alluxioURI, ufsURI, MountOptions.defaults());
     AlluxioURI preUfsURI = ufsURI.getParent();
     AlluxioURI anotherAlluxioURI = new AlluxioURI("/hi");
-    mThrown.expect(InvalidPathException.class);
+    mThrown.expect(FailedPreconditionException.class);
     mFileSystemMaster.mount(anotherAlluxioURI, preUfsURI, MountOptions.defaults());
   }
 
@@ -1415,7 +1415,7 @@ public final class FileSystemMasterTest {
     AlluxioURI alluxioURI = new AlluxioURI("/hello");
     mFileSystemMaster.mount(alluxioURI, preUfsURI, MountOptions.defaults());
     AlluxioURI anotherAlluxioURI = new AlluxioURI("/hi");
-    mThrown.expect(InvalidPathException.class);
+    mThrown.expect(FailedPreconditionException.class);
     mFileSystemMaster.mount(anotherAlluxioURI, ufsURI, MountOptions.defaults());
   }
 

@@ -12,6 +12,7 @@
 package alluxio.security.authorization;
 
 import alluxio.exception.ExceptionMessage;
+import alluxio.exception.status.InternalException;
 import alluxio.security.authorization.Mode.Bits;
 
 import org.apache.commons.lang3.StringUtils;
@@ -97,7 +98,7 @@ public final class ModeParser {
             specBits = specBits.or(Bits.EXECUTE);
             break;
           default:
-            // Should never get here as already checked for invalid targets
+            throw new InternalException("Unrecognized mode char: " + permChar);
         }
       }
 
@@ -120,6 +121,7 @@ public final class ModeParser {
             break;
           default:
             // Should never get here as already checked for invalid targets
+            throw new InternalException("Unrecognized target char: " + targetChar);
         }
       }
     }

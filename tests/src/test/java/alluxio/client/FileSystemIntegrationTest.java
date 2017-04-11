@@ -35,8 +35,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
-import java.io.IOException;
-
 /**
  * Integration tests on Alluxio Client (reuse the {@link LocalAlluxioCluster}).
  */
@@ -280,8 +278,9 @@ public final class FileSystemIntegrationTest {
       // Cannot mount to path that shadows a file in the primary UFS
       mFileSystem.mount(new AlluxioURI("/dir1"), new AlluxioURI(subdirPath));
       Assert.fail("Cannot mount to path that shadows a file in the primary UFS");
-    } catch (IOException e) {
-      // Exception expected, continue
+    } catch (FailedPreconditionException e) {
+      Assert.assertEquals(ExceptionMessage.MOUNT_PATH_SHADOWS_DEFAULT_UFS.getMessage("/dir1"),
+          e.getMessage());
     } finally {
       destroyAlternateUfs(alternateUfsRoot);
     }
