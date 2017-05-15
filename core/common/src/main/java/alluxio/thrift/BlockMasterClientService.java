@@ -47,7 +47,7 @@ public class BlockMasterClientService {
      * 
      * @param blockId the id of the block
      */
-    public alluxio.thrift.BlockInfo getBlockInfo(long blockId) throws alluxio.thrift.AlluxioTException, org.apache.thrift.TException;
+    public GetBlockInfoResponse getBlockInfo(long blockId) throws alluxio.thrift.AlluxioTException, org.apache.thrift.TException;
 
     /**
      * Returns the capacity (in bytes).
@@ -98,7 +98,7 @@ public class BlockMasterClientService {
       super(iprot, oprot);
     }
 
-    public alluxio.thrift.BlockInfo getBlockInfo(long blockId) throws alluxio.thrift.AlluxioTException, org.apache.thrift.TException
+    public GetBlockInfoResponse getBlockInfo(long blockId) throws alluxio.thrift.AlluxioTException, org.apache.thrift.TException
     {
       send_getBlockInfo(blockId);
       return recv_getBlockInfo();
@@ -111,7 +111,7 @@ public class BlockMasterClientService {
       sendBase("getBlockInfo", args);
     }
 
-    public alluxio.thrift.BlockInfo recv_getBlockInfo() throws alluxio.thrift.AlluxioTException, org.apache.thrift.TException
+    public GetBlockInfoResponse recv_getBlockInfo() throws alluxio.thrift.AlluxioTException, org.apache.thrift.TException
     {
       getBlockInfo_result result = new getBlockInfo_result();
       receiveBase(result, "getBlockInfo");
@@ -239,7 +239,7 @@ public class BlockMasterClientService {
         prot.writeMessageEnd();
       }
 
-      public alluxio.thrift.BlockInfo getResult() throws alluxio.thrift.AlluxioTException, org.apache.thrift.TException {
+      public GetBlockInfoResponse getResult() throws alluxio.thrift.AlluxioTException, org.apache.thrift.TException {
         if (getState() != org.apache.thrift.async.TAsyncMethodCall.State.RESPONSE_READ) {
           throw new IllegalStateException("Method call not finished!");
         }
@@ -474,7 +474,7 @@ public class BlockMasterClientService {
       return processMap;
     }
 
-    public static class getBlockInfo<I extends AsyncIface> extends org.apache.thrift.AsyncProcessFunction<I, getBlockInfo_args, alluxio.thrift.BlockInfo> {
+    public static class getBlockInfo<I extends AsyncIface> extends org.apache.thrift.AsyncProcessFunction<I, getBlockInfo_args, GetBlockInfoResponse> {
       public getBlockInfo() {
         super("getBlockInfo");
       }
@@ -483,10 +483,10 @@ public class BlockMasterClientService {
         return new getBlockInfo_args();
       }
 
-      public AsyncMethodCallback<alluxio.thrift.BlockInfo> getResultHandler(final AsyncFrameBuffer fb, final int seqid) {
+      public AsyncMethodCallback<GetBlockInfoResponse> getResultHandler(final AsyncFrameBuffer fb, final int seqid) {
         final org.apache.thrift.AsyncProcessFunction fcall = this;
-        return new AsyncMethodCallback<alluxio.thrift.BlockInfo>() { 
-          public void onComplete(alluxio.thrift.BlockInfo o) {
+        return new AsyncMethodCallback<GetBlockInfoResponse>() { 
+          public void onComplete(GetBlockInfoResponse o) {
             getBlockInfo_result result = new getBlockInfo_result();
             result.success = o;
             try {
@@ -526,7 +526,7 @@ public class BlockMasterClientService {
         return false;
       }
 
-      public void start(I iface, getBlockInfo_args args, org.apache.thrift.async.AsyncMethodCallback<alluxio.thrift.BlockInfo> resultHandler) throws TException {
+      public void start(I iface, getBlockInfo_args args, org.apache.thrift.async.AsyncMethodCallback<GetBlockInfoResponse> resultHandler) throws TException {
         iface.getBlockInfo(args.blockId,resultHandler);
       }
     }
@@ -1086,7 +1086,7 @@ public class BlockMasterClientService {
       schemes.put(TupleScheme.class, new getBlockInfo_resultTupleSchemeFactory());
     }
 
-    private alluxio.thrift.BlockInfo success; // required
+    private GetBlockInfoResponse success; // required
     private alluxio.thrift.AlluxioTException e; // required
 
     /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
@@ -1155,7 +1155,7 @@ public class BlockMasterClientService {
     static {
       Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
       tmpMap.put(_Fields.SUCCESS, new org.apache.thrift.meta_data.FieldMetaData("success", org.apache.thrift.TFieldRequirementType.DEFAULT, 
-          new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, alluxio.thrift.BlockInfo.class)));
+          new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, GetBlockInfoResponse.class)));
       tmpMap.put(_Fields.E, new org.apache.thrift.meta_data.FieldMetaData("e", org.apache.thrift.TFieldRequirementType.DEFAULT, 
           new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRUCT)));
       metaDataMap = Collections.unmodifiableMap(tmpMap);
@@ -1166,7 +1166,7 @@ public class BlockMasterClientService {
     }
 
     public getBlockInfo_result(
-      alluxio.thrift.BlockInfo success,
+      GetBlockInfoResponse success,
       alluxio.thrift.AlluxioTException e)
     {
       this();
@@ -1179,7 +1179,7 @@ public class BlockMasterClientService {
      */
     public getBlockInfo_result(getBlockInfo_result other) {
       if (other.isSetSuccess()) {
-        this.success = new alluxio.thrift.BlockInfo(other.success);
+        this.success = new GetBlockInfoResponse(other.success);
       }
       if (other.isSetE()) {
         this.e = new alluxio.thrift.AlluxioTException(other.e);
@@ -1196,11 +1196,11 @@ public class BlockMasterClientService {
       this.e = null;
     }
 
-    public alluxio.thrift.BlockInfo getSuccess() {
+    public GetBlockInfoResponse getSuccess() {
       return this.success;
     }
 
-    public getBlockInfo_result setSuccess(alluxio.thrift.BlockInfo success) {
+    public getBlockInfo_result setSuccess(GetBlockInfoResponse success) {
       this.success = success;
       return this;
     }
@@ -1250,7 +1250,7 @@ public class BlockMasterClientService {
         if (value == null) {
           unsetSuccess();
         } else {
-          setSuccess((alluxio.thrift.BlockInfo)value);
+          setSuccess((GetBlockInfoResponse)value);
         }
         break;
 
@@ -1454,7 +1454,7 @@ public class BlockMasterClientService {
           switch (schemeField.id) {
             case 0: // SUCCESS
               if (schemeField.type == org.apache.thrift.protocol.TType.STRUCT) {
-                struct.success = new alluxio.thrift.BlockInfo();
+                struct.success = new GetBlockInfoResponse();
                 struct.success.read(iprot);
                 struct.setSuccessIsSet(true);
               } else { 
@@ -1533,7 +1533,7 @@ public class BlockMasterClientService {
         TTupleProtocol iprot = (TTupleProtocol) prot;
         BitSet incoming = iprot.readBitSet(2);
         if (incoming.get(0)) {
-          struct.success = new alluxio.thrift.BlockInfo();
+          struct.success = new GetBlockInfoResponse();
           struct.success.read(iprot);
           struct.setSuccessIsSet(true);
         }

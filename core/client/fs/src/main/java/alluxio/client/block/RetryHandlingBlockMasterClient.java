@@ -103,7 +103,7 @@ public final class RetryHandlingBlockMasterClient extends AbstractMasterClient
     return retryRPC(new RpcCallable<BlockInfo>() {
       @Override
       public BlockInfo call() throws TException {
-        return ThriftUtils.fromThrift(mClient.getBlockInfo(blockId));
+        return ThriftUtils.fromThrift(mClient.getBlockInfo(blockId).getResponse());
       }
     });
   }

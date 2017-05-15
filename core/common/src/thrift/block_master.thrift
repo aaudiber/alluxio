@@ -13,6 +13,11 @@ struct WorkerInfo {
   7: i64 startTimeMs
 }
 
+struct GetBlockInfoResponse {
+  1: common.CommonRpcInfo commonRpcInfo
+  2: common.BlockInfo response
+}
+
 /**
  * This interface contains block master service endpoints for Alluxio clients.
  */
@@ -21,7 +26,7 @@ service BlockMasterClientService extends common.AlluxioService {
   /**
    * Returns the block information for the given block id.
    */
-  common.BlockInfo getBlockInfo(
+  GetBlockInfoResponse getBlockInfo(
     /** the id of the block */  1: i64 blockId,
     )
     throws (1: exception.AlluxioTException e)
