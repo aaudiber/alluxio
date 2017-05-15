@@ -59,6 +59,12 @@ struct RpcOptions {
   1: optional string key
 }
 
+/**
+* Common response information shared by all RPCs.
+*/
+struct CommonRpcInfo {
+}
+
 service AlluxioService {
 
   /**
