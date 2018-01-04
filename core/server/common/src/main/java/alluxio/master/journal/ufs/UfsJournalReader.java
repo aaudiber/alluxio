@@ -176,6 +176,8 @@ public final class UfsJournalReader implements JournalReader {
       return readInternal();
     } else if (mInputStream.mFile.isIncompleteLog()) {
       // Incomplete logs may end early.
+      LOG.info("Incomplete log [{}-{}) finished at sequence ID {}", mInputStream.mFile.getStart(),
+          mInputStream.mFile.getEnd(), mNextSequenceNumber - 1);
       return null;
     } else {
       Preconditions.checkState(mInputStream.mFile.isCompletedLog(),

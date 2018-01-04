@@ -58,6 +58,7 @@ public final class ProcessUtils {
       public void run() {
         try {
           process.stop();
+          LOG.info("Master shutdown complete");
         } catch (Exception e) {
           LOG.error("Failed to shutdown process.", e);
           System.exit(-1);

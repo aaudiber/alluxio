@@ -130,7 +130,7 @@ function killAll {
         sleep 1
       else
         # waited long enough, kill the process
-        echo "Process did not complete after 30 seconds, killing."
+        echo "Process did not complete after ${cnt} seconds, killing."
         kill -9 ${pid} 2> /dev/null
       fi
     done

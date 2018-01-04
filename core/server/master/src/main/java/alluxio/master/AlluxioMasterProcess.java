@@ -216,7 +216,6 @@ public class AlluxioMasterProcess implements MasterProcess {
       stopServing();
       stopMasters();
       mJournalSystem.stop();
-      mIsServing = false;
     }
   }
 
