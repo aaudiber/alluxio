@@ -48,6 +48,8 @@ public final class ConfigurationTestUtils {
   public static Map<PropertyKey, String> testConfigurationDefaults(String hostname,
       String workDirectory) {
     Map<PropertyKey, String> conf = new HashMap<>();
+    conf.put(PropertyKey.HOME, PathUtils.concatPath(System.getProperty("user.dir"), ".."));
+
     conf.put(PropertyKey.MASTER_HOSTNAME, hostname);
     conf.put(PropertyKey.WORKER_BIND_HOST, hostname);
     conf.put(PropertyKey.WORKER_DATA_BIND_HOST, hostname);
