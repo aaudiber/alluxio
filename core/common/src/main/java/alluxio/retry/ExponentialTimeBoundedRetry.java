@@ -36,9 +36,9 @@ public final class ExponentialTimeBoundedRetry extends TimeBoundedRetry {
   /**
    * See {@link Builder}.
    */
-  private ExponentialTimeBoundedRetry(TimeContext timeCtx, Duration maxDuration,
+  private ExponentialTimeBoundedRetry(TimeContext timeCtx, Duration maxDuration, int minRetries,
       Duration initialSleep, Duration maxSleep) {
-    super(timeCtx, maxDuration);
+    super(timeCtx, maxDuration, minRetries);
     mMaxSleep = maxSleep;
     mNextSleep = initialSleep;
   }
@@ -68,6 +68,7 @@ public final class ExponentialTimeBoundedRetry extends TimeBoundedRetry {
   public static class Builder {
     private TimeContext mTimeCtx = TimeContext.SYSTEM;
     private Duration mMaxDuration;
+    private int mMinRetries;
     private Duration mInitialSleep;
     private Duration mMaxSleep;
 
@@ -86,6 +87,16 @@ public final class ExponentialTimeBoundedRetry extends TimeBoundedRetry {
      */
     public Builder withMaxDuration(Duration maxDuration) {
       mMaxDuration = maxDuration;
+      return this;
+    }
+
+    /**
+     * @param minRetries the minimum number of retries to perform before giving up. Even if the time
+     *        bound is exceeded, we will still perform at least this many retries
+     * @return the builder
+     */
+    public Builder withMinRetries(int minRetries) {
+      mMinRetries = minRetries;
       return this;
     }
 
@@ -111,7 +122,8 @@ public final class ExponentialTimeBoundedRetry extends TimeBoundedRetry {
      * @return the built retry mechanism
      */
     public ExponentialTimeBoundedRetry build() {
-      return new ExponentialTimeBoundedRetry(mTimeCtx, mMaxDuration, mInitialSleep, mMaxSleep);
+      return new ExponentialTimeBoundedRetry(mTimeCtx, mMaxDuration, mMinRetries, mInitialSleep,
+          mMaxSleep);
     }
   }
 }

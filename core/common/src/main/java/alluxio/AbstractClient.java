@@ -170,7 +170,7 @@ public abstract class AbstractClient implements Client {
     Preconditions.checkState(!mClosed, "Client is closed, will not try to connect.");
 
     RetryPolicy retryPolicy =
-        ExponentialTimeBoundedRetry.builder().withMaxDuration(MAX_RETRY_DURATION)
+        ExponentialTimeBoundedRetry.builder().withMaxDuration(MAX_RETRY_DURATION).withMinRetries(3)
             .withInitialSleep(BASE_SLEEP_MS).withMaxSleep(MAX_SLEEP_MS).build();
     while (true) {
       if (mClosed) {
@@ -184,6 +184,8 @@ public abstract class AbstractClient implements Client {
         if (!retryPolicy.attemptRetry()) {
           break;
         }
+        LOG.warn("Failed to determine master RPC address ({}), retrying: {}",
+            retryPolicy.getRetryCount(), e.toString());
         continue;
       }
       LOG.info("Alluxio client (version {}) is trying to connect with {} @ {}",
@@ -293,7 +295,7 @@ public abstract class AbstractClient implements Client {
    */
   protected synchronized <V> V retryRPC(RpcCallable<V> rpc) throws AlluxioStatusException {
     RetryPolicy retryPolicy =
-        ExponentialTimeBoundedRetry.builder().withMaxDuration(MAX_RETRY_DURATION)
+        ExponentialTimeBoundedRetry.builder().withMaxDuration(MAX_RETRY_DURATION).withMinRetries(3)
             .withInitialSleep(BASE_SLEEP_MS).withMaxSleep(MAX_SLEEP_MS).build();
     while (!mClosed) {
       Exception ex;

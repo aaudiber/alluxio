@@ -26,20 +26,23 @@ public abstract class TimeBoundedRetry implements RetryPolicy {
   private final Clock mClock;
   private final Sleeper mSleeper;
   private final Duration mMaxDuration;
+  private final int mMinRetries;
   private final Instant mStartTime;
   private final Instant mEndTime;
 
   private int mRetryCount = 0;
-  private boolean mDone = false;
 
   /**
    * @param timeCtx the time context to use for time-based operations
    * @param maxDuration the maximum duration
+   * @param minRetries the minimum number of retries to perform before giving up. Even if the time
+   *        bound is exceeded, we will still perform at least this many retries
    */
-  public TimeBoundedRetry(TimeContext timeCtx, Duration maxDuration) {
+  public TimeBoundedRetry(TimeContext timeCtx, Duration maxDuration, int minRetries) {
     mClock = timeCtx.getClock();
     mSleeper = timeCtx.getSleeper();
     mMaxDuration = maxDuration;
+    mMinRetries = minRetries;
     mRetryCount = 0;
     mStartTime = mClock.instant();
     mEndTime = mStartTime.plus(mMaxDuration);
@@ -52,22 +55,20 @@ public abstract class TimeBoundedRetry implements RetryPolicy {
 
   @Override
   public boolean attemptRetry() {
-    if (mDone) {
-      return false;
-    }
     Instant now = mClock.instant();
-    // We should not do a retry if now == mEndTime. The final retry is timed to land at mEndTime,
-    // so if now == mEndTime, the operation may have taken less than 1ms.
-    if (!now.isBefore(mEndTime)) {
-      mDone = true;
-      return false;
-    }
-    try {
-      Duration nextWaitTime = computeNextWaitTime();
+    Duration nextWaitTime;
+    if (mRetryCount < mMinRetries) {
+      nextWaitTime = computeNextWaitTime();
+    } else {
+      if (now.isAfter(mEndTime) || now.equals(mEndTime)) {
+        return false;
+      }
+      nextWaitTime = computeNextWaitTime();
       if (now.plus(nextWaitTime).isAfter(mEndTime)) {
         nextWaitTime = Duration.between(now, mEndTime);
-        mDone = true;
       }
+    }
+    try {
       mSleeper.sleep(nextWaitTime);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();

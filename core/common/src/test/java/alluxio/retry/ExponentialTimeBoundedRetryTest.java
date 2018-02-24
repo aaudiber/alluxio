@@ -13,13 +13,14 @@ package alluxio.retry;
 
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.lessThanOrEqualTo;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
 
 import alluxio.Constants;
 import alluxio.clock.ManualClock;
 import alluxio.time.ManualSleeper;
 import alluxio.time.TimeContext;
-import alluxio.util.CommonUtils;
 
 import org.junit.Test;
 
@@ -33,9 +34,8 @@ import java.util.Iterator;
 public final class ExponentialTimeBoundedRetryTest {
   @Test
   public void exponentialBackoff() throws InterruptedException {
-    // Run the test multiple times to cover more cases due to randomness of jitter. This can be
-    // cranked up for debugging purposes. We keep it low to avoid taking too much test time.
-    for (int i = 0; i < 2; i++) {
+    // Run the test multiple times to cover more cases due to randomness of jitter.
+    for (int i = 0; i < 100; i++) {
       ManualClock clock = new ManualClock();
       ManualSleeper sleeper = new ManualSleeper();
       long maxDurationMs = 500;
@@ -49,13 +49,12 @@ public final class ExponentialTimeBoundedRetryTest {
 
       Thread thread = new Thread(() -> {
         do {
-          CommonUtils.sleepMs(taskTimeMs);
           clock.addTimeMs(taskTimeMs);
         } while (retry.attemptRetry());
       });
       thread.setDaemon(true);
-      thread.start();
       thread.setName("time-bounded-exponential-backoff-test");
+      thread.start();
 
       long timeRemainingMs = maxDurationMs - taskTimeMs;
       Iterator<Long> expectedBaseTimes = Arrays.asList(10L, 20L, 40L, 80L, 100L).iterator();
@@ -76,7 +75,49 @@ public final class ExponentialTimeBoundedRetryTest {
       }
       thread.interrupt();
       thread.join(10 * Constants.SECOND_MS);
+      assertFalse(retry.attemptRetry());
     }
+  }
+
+  @Test
+  public void minRetriesCanExceedTimeBound() throws Exception {
+    ManualClock clock = new ManualClock();
+    ManualSleeper sleeper = new ManualSleeper();
+    int minRetries = 10;
+    long taskTimeMs = 20;
+    ExponentialTimeBoundedRetry retry =
+        ExponentialTimeBoundedRetry.builder()
+            .withTimeCtx(new TimeContext(clock, sleeper))
+            .withMaxDuration(Duration.ofMillis(50))
+            .withMinRetries(minRetries)
+            .withInitialSleep(Duration.ofMillis(10))
+            .withMaxSleep(Duration.ofMillis(100))
+            .build();
+
+    Thread thread = new Thread(() -> {
+      do {
+        clock.addTimeMs(taskTimeMs);
+      } while (retry.attemptRetry());
+    });
+    thread.setDaemon(true);
+    thread.setName("time-bounded-min-retries-test");
+    thread.start();
+
+    Iterator<Long> expectedBaseTimes = Arrays.asList(10L, 20L, 40L, 80L, 100L).iterator();
+    long expectedTime = expectedBaseTimes.next();
+    for (int i = 0; i < minRetries; i++) {
+      Duration actualSleep = sleeper.waitForSleep();
+      assertEquals(i, retry.getRetryCount());
+      checkBetween(expectedTime, expectedTime * 1.1, actualSleep);
+      clock.addTime(actualSleep);
+      sleeper.wakeUp();
+      if (expectedBaseTimes.hasNext()) {
+        expectedTime = expectedBaseTimes.next();
+      }
+    }
+    thread.interrupt();
+    thread.join(10 * Constants.SECOND_MS);
+    assertFalse(retry.attemptRetry());
   }
 
   private void checkBetween(double start, double end, Duration time) {
