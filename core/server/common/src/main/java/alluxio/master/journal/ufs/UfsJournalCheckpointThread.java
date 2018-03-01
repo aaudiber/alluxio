@@ -12,6 +12,7 @@
 package alluxio.master.journal.ufs;
 
 import alluxio.Configuration;
+import alluxio.Constants;
 import alluxio.PropertyKey;
 import alluxio.exception.InvalidJournalEntryException;
 import alluxio.master.journal.JournalEntryStateMachine;
@@ -159,6 +160,7 @@ public final class UfsJournalCheckpointThread extends Thread {
 
         mJournalReader = new UfsJournalReader(mJournal, nextSequenceNumber, false);
         quietPeriodWaited = false;
+        CommonUtils.sleepMs(5 * Constants.SECOND_MS);
         continue;
       }
 
