@@ -1565,7 +1565,7 @@ public final class DefaultFileSystemMaster extends AbstractMaster implements Fil
       }
       if (!failedUris.isEmpty()) {
         // TODO(adit): Distinguish b/w different failure types
-        throw new FailedPreconditionException(ExceptionMessage.DELETE_FAILED_UFS
+        throw new IOException(ExceptionMessage.DELETE_FAILED_UFS
             .getMessage(StringUtils.join(failedUris, ',')));
       }
     }
