@@ -61,8 +61,7 @@ public final class ConfigurationUtils {
   }
 
   /**
-   * Loads properties from the given file. This method will search Classpath for the properties
-   * file.
+   * Loads properties from the given file.
    *
    * @param filePath the absolute path of the file to load properties
    * @return a set of properties on success, or null if failed
@@ -82,7 +81,7 @@ public final class ConfigurationUtils {
   }
 
   /**
-   * Searches the given properties file from a list of paths as well as the classpath.
+   * Searches the given properties file from a list of paths.
    *
    * @param propertiesFile the file to load properties
    * @param confPathList a list of paths to search the propertiesFile
