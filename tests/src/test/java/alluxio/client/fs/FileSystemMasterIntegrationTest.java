@@ -735,7 +735,6 @@ public class FileSystemMasterIntegrationTest extends BaseIntegrationTest {
   }
 
   @Test
-  @Ignore("we'll come back to this later")
   public void concurrentCreateDelete() throws Exception {
     List<Future<?>> futures = new ArrayList<>();
     AlluxioURI directory = new AlluxioURI("/dir");

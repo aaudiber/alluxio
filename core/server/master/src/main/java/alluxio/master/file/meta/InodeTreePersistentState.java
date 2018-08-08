@@ -11,6 +11,7 @@
 
 package alluxio.master.file.meta;
 
+import alluxio.ProcessUtils;
 import alluxio.collections.ConcurrentHashSet;
 import alluxio.collections.FieldIndex;
 import alluxio.collections.IndexDefinition;
@@ -102,7 +103,6 @@ public class InodeTreePersistentState {
    * @param entry the entry
    */
   public void apply(JournalEntry entry) {
-    LOG.info("{}\n", entry);
     if (entry.hasDeleteFile()) apply(entry.getDeleteFile());
     if (entry.hasInodeDirectory()) apply(entry.getInodeDirectory());
     if (entry.hasInodeFile()) apply(entry.getInodeFile());
@@ -120,9 +120,16 @@ public class InodeTreePersistentState {
     if (entry.hasReinitializeFile()) apply(entry.getReinitializeFile());
   }
 
-  public synchronized void applyAndJournal(Supplier<JournalContext> context, DeleteFileEntry entry) {
-    apply(entry);
+  public void applyAndJournal(Supplier<JournalContext> context, DeleteFileEntry entry) {
     context.get().append(JournalEntry.newBuilder().setDeleteFile(entry).build());
+    try {
+      apply(entry);
+    } catch (Throwable t) {
+      // Delete entries should always apply cleanly, but if it somehow fails, we are in a state
+      // where we've journaled the delete, but failed to make the in-memory update. We don't yet
+      // have a way to recover from this, so we give a fatal error.
+      ProcessUtils.fatalError(LOG, t, "Failed to apply entry %s", entry);
+    }
   }
 
   /**
@@ -130,7 +137,7 @@ public class InodeTreePersistentState {
    *         concurrently added with the same name. On false return, no state is changed,
    *         and no journal entry is written
    */
-  public synchronized boolean applyAndJournal(Supplier<JournalContext> context, RenameEntry entry) {
+  public boolean applyAndJournal(Supplier<JournalContext> context, RenameEntry entry) {
     if (applyRename(entry)) {
       context.get().append(JournalEntry.newBuilder().setRename(entry).build());
       return true;
@@ -138,22 +145,22 @@ public class InodeTreePersistentState {
     return false;
   }
 
-  public synchronized void applyAndJournal(Supplier<JournalContext> context, SetAclEntry entry) {
+  public void applyAndJournal(Supplier<JournalContext> context, SetAclEntry entry) {
     apply(entry);
     context.get().append(JournalEntry.newBuilder().setSetAcl(entry).build());
   }
 
-  public synchronized void applyAndJournal(Supplier<JournalContext> context, UpdateInodeEntry entry) {
+  public void applyAndJournal(Supplier<JournalContext> context, UpdateInodeEntry entry) {
     apply(entry);
     context.get().append(JournalEntry.newBuilder().setUpdateInode(entry).build());
   }
 
-  public synchronized void applyAndJournal(Supplier<JournalContext> context, UpdateInodeDirectoryEntry entry) {
+  public void applyAndJournal(Supplier<JournalContext> context, UpdateInodeDirectoryEntry entry) {
     apply(entry);
     context.get().append(JournalEntry.newBuilder().setUpdateInodeDirectory(entry).build());
   }
 
-  public synchronized void applyAndJournal(Supplier<JournalContext> context, UpdateInodeFileEntry entry) {
+  public void applyAndJournal(Supplier<JournalContext> context, UpdateInodeFileEntry entry) {
     apply(entry);
     context.get().append(JournalEntry.newBuilder().setUpdateInodeFile(entry).build());
   }
@@ -163,7 +170,7 @@ public class InodeTreePersistentState {
    *         concurrently added with the same name. On false return, no state is changed,
    *         and no journal entry is written
    */
-  public synchronized boolean applyAndJournal(Supplier<JournalContext> context, Inode<?> inode) {
+  public boolean applyAndJournal(Supplier<JournalContext> context, Inode<?> inode) {
     if (applyInode(inode)) {
       context.get().append(inode.toJournalEntry());
       return true;
@@ -179,7 +186,6 @@ public class InodeTreePersistentState {
     long id = entry.getId();
     Inode<?> inode = mInodes.getFirst(id);
     InodeDirectory parent = (InodeDirectory) mInodes.getFirst(inode.getParentId());
-    LOG.info("Deleted {}", id);
     mInodes.remove(inode);
     parent.removeChild(inode);
     parent.setLastModificationTimeMs(entry.getOpTimeMs());
@@ -192,7 +198,9 @@ public class InodeTreePersistentState {
   }
 
   private void apply(InodeFileEntry entry) {
-    Preconditions.checkState(applyInode(InodeFile.fromJournalEntry(entry)));
+    if (!applyInode(InodeFile.fromJournalEntry(entry))) {
+      throw new RuntimeException("Failed to apply " + entry);
+    }
   }
 
   /**
@@ -212,7 +220,7 @@ public class InodeTreePersistentState {
     mInodes.add(inode);
     InodeDirectory parent = (InodeDirectory) mInodes.getFirst(inode.getParentId());
     if (!parent.addChild(inode)) {
-      LOG.info("Failed to add {}", inode.getId());
+      LOG.info("Failed to add {} ({})", inode.getName(), inode.getId());
       mInodes.remove(inode);
       return false;
     }
