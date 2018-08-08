@@ -49,7 +49,6 @@ import alluxio.wire.FileBlockInfo;
 import alluxio.wire.FileInfo;
 import alluxio.wire.MountPointInfo;
 import alluxio.wire.SetAclAction;
-import alluxio.wire.TtlAction;
 import alluxio.wire.WorkerInfo;
 
 import java.io.IOException;
@@ -193,21 +192,6 @@ public interface FileSystemMaster extends Master {
       BlockInfoException, IOException, FileDoesNotExistException;
 
   /**
-   * Reinitializes the blocks of an existing open file.
-   *
-   * @param path the path to the file
-   * @param blockSizeBytes the new block size
-   * @param ttl the ttl
-   * @param ttlAction action to take after Ttl expiry
-   * @return the file id
-   * @throws InvalidPathException if the path is invalid
-   * @throws FileDoesNotExistException if the path does not exist
-   */
-  // Used by lineage master
-  long reinitializeFile(AlluxioURI path, long blockSizeBytes, long ttl, TtlAction ttlAction)
-      throws InvalidPathException, FileDoesNotExistException, UnavailableException;
-
-  /**
    * Gets a new block id for the next block of a given file to write to.
    * <p>
    * This operation requires users to have WRITE permission on the path as
@@ -220,7 +204,7 @@ public interface FileSystemMaster extends Master {
    * @throws AccessControlException if permission checking fails
    */
   long getNewBlockIdForFile(AlluxioURI path)
-      throws FileDoesNotExistException, InvalidPathException, AccessControlException;
+      throws FileDoesNotExistException, InvalidPathException, AccessControlException, UnavailableException;
 
   /**
    * @return a copy of the current mount table
@@ -435,21 +419,6 @@ public interface FileSystemMaster extends Master {
    */
   void unmount(AlluxioURI alluxioPath) throws FileDoesNotExistException, InvalidPathException,
       IOException, AccessControlException;
-
-  /**
-   * Resets a file. It first free the whole file, and then reinitializes it.
-   *
-   * @param fileId the id of the file
-   * @throws FileDoesNotExistException if the file does not exist
-   * @throws AccessControlException if permission checking fails
-   * @throws InvalidPathException if the path is invalid for the id of the file
-   * @throws UnexpectedAlluxioException if the file or directory can not be freed
-   */
-  // Currently used by Lineage Master
-  // TODO(binfan): Add permission checking for internal APIs
-  void resetFile(long fileId)
-      throws UnexpectedAlluxioException, FileDoesNotExistException, InvalidPathException,
-      AccessControlException, IOException;
 
   /**
    * Sets the ACL for a path.

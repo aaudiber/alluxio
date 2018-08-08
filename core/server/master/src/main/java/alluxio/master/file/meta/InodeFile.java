@@ -19,6 +19,7 @@ import alluxio.master.ProtobufUtils;
 import alluxio.master.block.BlockId;
 import alluxio.master.file.options.CreateFileOptions;
 import alluxio.proto.journal.File.InodeFileEntry;
+import alluxio.proto.journal.File.UpdateInodeFileEntry;
 import alluxio.proto.journal.Journal.JournalEntry;
 import alluxio.security.authorization.AccessControlList;
 import alluxio.security.authorization.DefaultAccessControlList;
@@ -36,7 +37,7 @@ import javax.annotation.concurrent.NotThreadSafe;
  * ({@link #lockRead()} or {@link #lockWrite()}) before methods are called.
  */
 @NotThreadSafe
-public final class InodeFile extends Inode<InodeFile> {
+public final class InodeFile extends Inode<InodeFile> implements InodeFileView {
   private List<Long> mBlocks;
   private long mBlockContainerId;
   private long mBlockSizeBytes;
@@ -114,25 +115,53 @@ public final class InodeFile extends Inode<InodeFile> {
     throw new UnsupportedOperationException("setDefaultACL: File does not have default ACL");
   }
 
-  /**
-   * @return a duplication of all the block ids of the file
-   */
+  @Override
   public List<Long> getBlockIds() {
     return new ArrayList<>(mBlocks);
   }
 
-  /**
-   * @return the block size in bytes
-   */
+  @Override
   public long getBlockSizeBytes() {
     return mBlockSizeBytes;
   }
 
-  /**
-   * @return the length of the file in bytes. This is not accurate before the file is closed
-   */
+  @Override
   public long getLength() {
     return mLength;
+  }
+
+  @Override
+  public long getNextBlockId() {
+    long blockId = BlockId.createBlockId(mBlockContainerId, mBlocks.size());
+    // TODO(gene): Check for max block sequence number, and sanity check the sequence number.
+    // TODO(gene): Check isComplete?
+    // TODO(gene): This will not work with existing lineage implementation, since a new writer will
+    // not be able to get the same block ids (to write the same block ids).
+    return blockId;
+  }
+
+  @Override
+  public long getBlockContainerId() {
+    return mBlockContainerId;
+  }
+
+  @Override
+  public long getBlockIdByIndex(int blockIndex) throws BlockInfoException {
+    if (blockIndex < 0 || blockIndex >= mBlocks.size()) {
+      throw new BlockInfoException(
+          "blockIndex " + blockIndex + " is out of range. File blocks: " + mBlocks.size());
+    }
+    return mBlocks.get(blockIndex);
+  }
+
+  @Override
+  public boolean isCacheable() {
+    return mCacheable;
+  }
+
+  @Override
+  public boolean isCompleted() {
+    return mCompleted;
   }
 
   /**
@@ -146,35 +175,6 @@ public final class InodeFile extends Inode<InodeFile> {
     // not be able to get the same block ids (to write the same block ids).
     mBlocks.add(blockId);
     return blockId;
-  }
-
-  /**
-   * Gets the block id for a given index.
-   *
-   * @param blockIndex the index to get the block id for
-   * @return the block id for the index
-   * @throws BlockInfoException if the index of the block is out of range
-   */
-  public long getBlockIdByIndex(int blockIndex) throws BlockInfoException {
-    if (blockIndex < 0 || blockIndex >= mBlocks.size()) {
-      throw new BlockInfoException(
-          "blockIndex " + blockIndex + " is out of range. File blocks: " + mBlocks.size());
-    }
-    return mBlocks.get(blockIndex);
-  }
-
-  /**
-   * @return true if the file is cacheable, false otherwise
-   */
-  public boolean isCacheable() {
-    return mCacheable;
-  }
-
-  /**
-   * @return true if the file is complete, false otherwise
-   */
-  public boolean isCompleted() {
-    return mCompleted;
   }
 
   /**
@@ -258,6 +258,29 @@ public final class InodeFile extends Inode<InodeFile> {
     }
   }
 
+  /**
+   * Updates this inode file's state from the given entry.
+   *
+   * @param entry the entry
+   */
+  public void updateFromEntry(UpdateInodeFileEntry entry) {
+    if (entry.hasBlockSizeBytes()) {
+      setBlockSizeBytes(entry.getBlockSizeBytes());
+    }
+    if (entry.hasCacheable()) {
+      setCacheable(entry.getCacheable());
+    }
+    if (entry.hasCompleted()) {
+      setCompleted(entry.getCompleted());
+    }
+    if (entry.hasLength()) {
+      setLength(entry.getLength());
+    }
+    if (entry.getBlocksCount() > 0) {
+      setBlockIds(entry.getBlocksList());
+    }
+  }
+
   @Override
   public String toString() {
     return toStringHelper()
@@ -326,6 +349,7 @@ public final class InodeFile extends Inode<InodeFile> {
         .setTtl(options.getTtl())
         .setTtlAction(options.getTtlAction())
         .setParentId(parentId)
+        .setLastModificationTimeMs(options.getOperationTimeMs(), true)
         .setOwner(options.getOwner())
         .setGroup(options.getGroup())
         .setMode(options.getMode().toShort())
