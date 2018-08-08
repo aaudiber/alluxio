@@ -110,14 +110,13 @@ public class InodeDirectoryIdGenerator implements JournalEntryIterable {
         ).build());
   }
 
-  private static class InodeDirectoryIdGeneratorState implements PersistentState {
+  private static class InodeDirectoryIdGeneratorState {
     private final DirectoryId mNextDirectoryId = new DirectoryId();
 
     public UnmodifiableDirectoryId getDirectoryId() {
       return mNextDirectoryId.getUnmodifiableView();
     }
 
-    @Override
     public void apply(JournalEntry entry) {
       if (entry.hasInodeDirectoryIdGenerator()) apply(entry.getInodeDirectoryIdGenerator());
       else throw new IllegalStateException("Unexpected journal entry: " + entry);
@@ -133,7 +132,6 @@ public class InodeDirectoryIdGenerator implements JournalEntryIterable {
       mNextDirectoryId.setSequenceNumber(entry.getSequenceNumber());
     }
 
-    @Override
     public void reset() {
       mNextDirectoryId.setContainerId(0);
       mNextDirectoryId.setSequenceNumber(0);
