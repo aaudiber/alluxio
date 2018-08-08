@@ -1,3 +1,14 @@
+/*
+ * The Alluxio Open Foundation licenses this work under the Apache License, version 2.0
+ * (the "License"). You may not use this work except in compliance with the License, which is
+ * available at www.apache.org/licenses/LICENSE-2.0
+ *
+ * This software is distributed on an "AS IS" basis, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+ * either express or implied, as more fully set forth in the License.
+ *
+ * See the NOTICE file distributed with this work for information regarding copyright ownership.
+ */
+
 package alluxio.master.file.meta;
 
 import alluxio.collections.ConcurrentHashSet;
@@ -109,7 +120,7 @@ public class InodeTreePersistentState {
     if (entry.hasReinitializeFile()) apply(entry.getReinitializeFile());
   }
 
-  public void applyAndJournal(Supplier<JournalContext> context, DeleteFileEntry entry) {
+  public synchronized void applyAndJournal(Supplier<JournalContext> context, DeleteFileEntry entry) {
     apply(entry);
     context.get().append(JournalEntry.newBuilder().setDeleteFile(entry).build());
   }
@@ -119,7 +130,7 @@ public class InodeTreePersistentState {
    *         concurrently added with the same name. On false return, no state is changed,
    *         and no journal entry is written
    */
-  public boolean applyAndJournal(Supplier<JournalContext> context, RenameEntry entry) {
+  public synchronized boolean applyAndJournal(Supplier<JournalContext> context, RenameEntry entry) {
     if (applyRename(entry)) {
       context.get().append(JournalEntry.newBuilder().setRename(entry).build());
       return true;
@@ -127,22 +138,22 @@ public class InodeTreePersistentState {
     return false;
   }
 
-  public void applyAndJournal(Supplier<JournalContext> context, SetAclEntry entry) {
+  public synchronized void applyAndJournal(Supplier<JournalContext> context, SetAclEntry entry) {
     apply(entry);
     context.get().append(JournalEntry.newBuilder().setSetAcl(entry).build());
   }
 
-  public void applyAndJournal(Supplier<JournalContext> context, UpdateInodeEntry entry) {
+  public synchronized void applyAndJournal(Supplier<JournalContext> context, UpdateInodeEntry entry) {
     apply(entry);
     context.get().append(JournalEntry.newBuilder().setUpdateInode(entry).build());
   }
 
-  public void applyAndJournal(Supplier<JournalContext> context, UpdateInodeDirectoryEntry entry) {
+  public synchronized void applyAndJournal(Supplier<JournalContext> context, UpdateInodeDirectoryEntry entry) {
     apply(entry);
     context.get().append(JournalEntry.newBuilder().setUpdateInodeDirectory(entry).build());
   }
 
-  public void applyAndJournal(Supplier<JournalContext> context, UpdateInodeFileEntry entry) {
+  public synchronized void applyAndJournal(Supplier<JournalContext> context, UpdateInodeFileEntry entry) {
     apply(entry);
     context.get().append(JournalEntry.newBuilder().setUpdateInodeFile(entry).build());
   }
@@ -152,7 +163,7 @@ public class InodeTreePersistentState {
    *         concurrently added with the same name. On false return, no state is changed,
    *         and no journal entry is written
    */
-  public boolean applyAndJournal(Supplier<JournalContext> context, Inode<?> inode) {
+  public synchronized boolean applyAndJournal(Supplier<JournalContext> context, Inode<?> inode) {
     if (applyInode(inode)) {
       context.get().append(inode.toJournalEntry());
       return true;
@@ -301,44 +312,39 @@ public class InodeTreePersistentState {
   ////
 
   private void apply(AsyncPersistRequestEntry entry) {
-    apply(JournalEntry.newBuilder()
-        .setUpdateInode(UpdateInodeEntry.newBuilder()
-            .setId(entry.getFileId())
-            .setPersistenceState(PersistenceState.TO_BE_PERSISTED.name())
-        ).build());
+    apply(UpdateInodeEntry.newBuilder()
+        .setId(entry.getFileId())
+        .setPersistenceState(PersistenceState.TO_BE_PERSISTED.name())
+        .build());
   }
 
   private void apply(CompleteFileEntry entry) {
-    apply(JournalEntry.newBuilder()
-        .setUpdateInode(UpdateInodeEntry.newBuilder()
-            .setId(entry.getId())
-            .setLastModificationTimeMs(entry.getOpTimeMs())
-            .setUfsFingerprint(entry.getUfsFingerprint())
-        ).build());
-    apply(JournalEntry.newBuilder()
-        .setUpdateInodeFile(UpdateInodeFileEntry.newBuilder()
-            .setId(entry.getId())
-            .setLength(entry.getLength())
-            .addAllBlocks(entry.getBlockIdsList())
-        ).build());
+    apply(UpdateInodeEntry.newBuilder()
+        .setId(entry.getId())
+        .setLastModificationTimeMs(entry.getOpTimeMs())
+        .setUfsFingerprint(entry.getUfsFingerprint())
+        .build());
+    apply(UpdateInodeFileEntry.newBuilder()
+        .setId(entry.getId())
+        .setLength(entry.getLength())
+        .addAllBlocks(entry.getBlockIdsList())
+        .build());
   }
 
   private void apply(InodeLastModificationTimeEntry entry) {
     // This entry is deprecated, use UpdateInode instead.
-    apply(JournalEntry.newBuilder()
-        .setUpdateInode(UpdateInodeEntry.newBuilder()
-            .setId(entry.getId())
-            .setLastModificationTimeMs(entry.getLastModificationTimeMs())
-        ).build());
+    apply(UpdateInodeEntry.newBuilder()
+        .setId(entry.getId())
+        .setLastModificationTimeMs(entry.getLastModificationTimeMs())
+        .build());
   }
 
   private void apply(PersistDirectoryEntry entry) {
     // This entry is deprecated, use UpdateInode instead.
-    apply(JournalEntry.newBuilder()
-        .setUpdateInode(UpdateInodeEntry.newBuilder()
-            .setId(entry.getId())
-            .setPersistenceState(PersistenceState.PERSISTED.name())
-        ).build());
+    apply(UpdateInodeEntry.newBuilder()
+        .setId(entry.getId())
+        .setPersistenceState(PersistenceState.PERSISTED.name())
+        .build());
   }
 
   private void apply(ReinitializeFileEntry entry) {
