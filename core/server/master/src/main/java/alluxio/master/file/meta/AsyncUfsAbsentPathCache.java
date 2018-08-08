@@ -120,6 +120,7 @@ public final class AsyncUfsAbsentPathCache implements UfsAbsentPathCache {
     while (path != null && !path.equals(mountBaseUri)) {
       Long cached = mCache.getIfPresent(path.getPath());
       if (cached != null && cached == mountInfo.getMountId()) {
+        LOG.info("Determined that {} is missing based on the absent path cache", path);
         return true;
       }
       path = path.getParent();
@@ -136,6 +137,7 @@ public final class AsyncUfsAbsentPathCache implements UfsAbsentPathCache {
    * @return if true, further traversal of the descendant paths should continue
    */
   private boolean processSinglePath(AlluxioURI alluxioUri, MountInfo mountInfo) {
+    LOG.info("Processing {} for the absent path cache", alluxioUri.getPath());
     PathLock pathLock = new PathLock();
     Lock writeLock = pathLock.writeLock();
     Lock readLock = null;
@@ -176,6 +178,7 @@ public final class AsyncUfsAbsentPathCache implements UfsAbsentPathCache {
         } else {
           // This is the first ufs path which does not exist. Add it to the cache.
           mCache.put(alluxioUri.getPath(), mountInfo.getMountId());
+          LOG.info("Added {} to the absent path cache", alluxioUri.getPath());
 
           if (pathLock.isInvalidate()) {
             // This path was marked to be invalidated, meaning this UFS path was just created,
