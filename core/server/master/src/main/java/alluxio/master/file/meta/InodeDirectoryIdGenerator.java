@@ -118,11 +118,15 @@ public class InodeDirectoryIdGenerator implements JournalEntryIterable {
     }
 
     public void apply(JournalEntry entry) {
-      if (entry.hasInodeDirectoryIdGenerator()) apply(entry.getInodeDirectoryIdGenerator());
-      else throw new IllegalStateException("Unexpected journal entry: " + entry);
+      if (entry.hasInodeDirectoryIdGenerator()) {
+        apply(entry.getInodeDirectoryIdGenerator());
+      } else {
+        throw new IllegalStateException("Unexpected journal entry: " + entry);
+      }
     }
 
-    public void applyAndJournal(Supplier<JournalContext> context, InodeDirectoryIdGeneratorEntry entry) {
+    public void applyAndJournal(Supplier<JournalContext> context,
+        InodeDirectoryIdGeneratorEntry entry) {
       apply(entry);
       context.get().append(JournalEntry.newBuilder().setInodeDirectoryIdGenerator(entry).build());
     }

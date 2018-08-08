@@ -52,7 +52,7 @@ final class LostFileDetector implements HeartbeatExecutor {
                .lockFullInodePath(fileId, InodeTree.LockMode.WRITE)) {
         InodeView inode = inodePath.getInode();
         if (inode.getPersistenceState() != PersistenceState.PERSISTED) {
-          mInodeTree.getState().applyAndJournal(journalContext, UpdateInodeEntry.newBuilder()
+          mInodeTree.updateInode(journalContext, UpdateInodeEntry.newBuilder()
               .setId(inode.getId())
               .setPersistenceState(PersistenceState.LOST.name())
               .build());

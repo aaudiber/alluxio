@@ -91,7 +91,6 @@ import alluxio.proto.journal.File.RenameEntry;
 import alluxio.proto.journal.File.SetAclEntry;
 import alluxio.proto.journal.File.SetAttributeEntry;
 import alluxio.proto.journal.File.StringPairEntry;
-import alluxio.proto.journal.File.UpdateInodeDirectoryEntry;
 import alluxio.proto.journal.File.UpdateInodeEntry;
 import alluxio.proto.journal.File.UpdateInodeFileEntry;
 import alluxio.proto.journal.File.UpdateInodeFileEntry.Builder;
@@ -451,8 +450,7 @@ public final class DefaultFileSystemMaster extends AbstractMaster implements Fil
         || entry.hasSetAttribute()
         || entry.hasUpdateInode()
         || entry.hasUpdateInodeDirectory()
-        || entry.hasUpdateInodeFile()
-        ) {
+        || entry.hasUpdateInodeFile()) {
       mInodeTree.apply(entry);
     } else if (entry.hasAddMountPoint()) {
       try {
@@ -1234,12 +1232,12 @@ public final class DefaultFileSystemMaster extends AbstractMaster implements Fil
 
     // We could introduce a concept of composite entries, so that these two entries could
     // be applied in a single call to applyAndJournal.
-    mInodeTree.getState().applyAndJournal(rpcContext, UpdateInodeEntry.newBuilder()
+    mInodeTree.updateInode(rpcContext, UpdateInodeEntry.newBuilder()
         .setId(inode.getId())
         .setUfsFingerprint(ufsFingerprint)
         .setLastModificationTimeMs(opTimeMs)
         .build());
-    mInodeTree.getState().applyAndJournal(rpcContext, entry.build());
+    mInodeTree.updateInodeFile(rpcContext, entry.build());
 
     Metrics.FILES_COMPLETED.inc();
   }
@@ -1350,7 +1348,7 @@ public final class DefaultFileSystemMaster extends AbstractMaster implements Fil
       Metrics.NEW_BLOCKS_GOT.inc();
 
       long blockId = inodePath.getInodeFile().getNextBlockId();
-      mInodeTree.getState().applyAndJournal(rpcContext, UpdateInodeFileEntry.newBuilder()
+      mInodeTree.updateInodeFile(rpcContext, UpdateInodeFileEntry.newBuilder()
           .setId(inodePath.getInode().getId())
           .addBlocks(blockId)
           .build());
@@ -1507,7 +1505,8 @@ public final class DefaultFileSystemMaster extends AbstractMaster implements Fil
     }
 
     boolean recursive = deleteOptions.isRecursive();
-    if (inode.isDirectory() && !recursive && ((InodeDirectoryView) inode).getNumberOfChildren() > 0) {
+    if (inode.isDirectory() && !recursive
+        && ((InodeDirectoryView) inode).getNumberOfChildren() > 0) {
       // inode is nonempty, and we don't want to delete a nonempty directory unless recursive is
       // true
       throw new DirectoryNotEmptyException(ExceptionMessage.DELETE_NONEMPTY_DIRECTORY_NONRECURSIVE,
@@ -1959,7 +1958,7 @@ public final class DefaultFileSystemMaster extends AbstractMaster implements Fil
         }
       }
 
-      mInodeTree.getState().applyAndJournal(rpcContext, UpdateInodeEntry.newBuilder()
+      mInodeTree.updateInode(rpcContext, UpdateInodeEntry.newBuilder()
           .setId(inodeDirectory.getId())
           .setUfsFingerprint(ufsFingerprint)
           .build());
@@ -2124,7 +2123,7 @@ public final class DefaultFileSystemMaster extends AbstractMaster implements Fil
 
     LOG.debug("Renaming {} to {}", srcPath, dstPath);
 
-    if (!mInodeTree.getState().applyAndJournal(rpcContext, RenameEntry.newBuilder()
+    if (!mInodeTree.rename(rpcContext, RenameEntry.newBuilder()
         .setId(srcInode.getId())
         .setOpTimeMs(options.getOperationTimeMs())
         .setNewParentId(dstParentInode.getId())
@@ -2184,7 +2183,7 @@ public final class DefaultFileSystemMaster extends AbstractMaster implements Fil
       }
     } catch (Exception e) {
       // On failure, revert changes and throw exception.
-      if (!mInodeTree.getState().applyAndJournal(rpcContext, RenameEntry.newBuilder()
+      if (!mInodeTree.rename(rpcContext, RenameEntry.newBuilder()
           .setId(srcInode.getId())
           .setOpTimeMs(options.getOperationTimeMs())
           .setNewName(srcName)
@@ -2259,7 +2258,7 @@ public final class DefaultFileSystemMaster extends AbstractMaster implements Fil
         // Stop if a persisted directory is encountered.
         break;
       }
-      mInodeTree.getState().applyAndJournal(rpcContext, UpdateInodeEntry.newBuilder()
+      mInodeTree.updateInode(rpcContext, UpdateInodeEntry.newBuilder()
           .setId(ancestor.getId())
           .setPersistenceState(PersistenceState.PERSISTED.name())
           .build());
@@ -2475,10 +2474,7 @@ public final class DefaultFileSystemMaster extends AbstractMaster implements Fil
       if (options.getUfsStatus() == null && !ufs.exists(ufsUri.toString())) {
         // uri does not exist in ufs
         InodeDirectoryView inode = (InodeDirectoryView) inodePath.getInode();
-        mInodeTree.getState().applyAndJournal(rpcContext, UpdateInodeDirectoryEntry.newBuilder()
-            .setId(inode.getId())
-            .setDirectChildrenLoaded(true)
-            .build());
+        mInodeTree.setDirectChildrenLoaded(rpcContext, inode.getId());
         return;
       }
       boolean isFile;
@@ -2526,17 +2522,11 @@ public final class DefaultFileSystemMaster extends AbstractMaster implements Fil
               if (options.getLoadDescendantType() == DescendantType.ALL
                   && tempInodePath.getInode().isDirectory()) {
                 InodeDirectoryView inodeDirectory = (InodeDirectoryView) tempInodePath.getInode();
-                mInodeTree.getState().applyAndJournal(rpcContext, UpdateInodeDirectoryEntry.newBuilder()
-                    .setId(inodeDirectory.getId())
-                    .setDirectChildrenLoaded(true)
-                    .build());
+                mInodeTree.setDirectChildrenLoaded(rpcContext, inodeDirectory.getId());
               }
             }
           }
-          mInodeTree.getState().applyAndJournal(rpcContext, UpdateInodeDirectoryEntry.newBuilder()
-              .setId(inode.getId())
-              .setDirectChildrenLoaded(true)
-              .build());
+          mInodeTree.setDirectChildrenLoaded(rpcContext, inode.getId());
         }
       }
     } catch (IOException e) {
@@ -3070,7 +3060,7 @@ public final class DefaultFileSystemMaster extends AbstractMaster implements Fil
       throws IOException, FileDoesNotExistException {
     InodeView inode = inodePath.getInode();
 
-    mInodeTree.getState().applyAndJournal(rpcContext, SetAclEntry.newBuilder()
+    mInodeTree.setAcl(rpcContext, SetAclEntry.newBuilder()
         .setId(inode.getId())
         .setOpTimeMs(opTimeMs)
         .setAction(action.toProto())
@@ -3249,7 +3239,7 @@ public final class DefaultFileSystemMaster extends AbstractMaster implements Fil
     checkUfsMode(path, OperationType.WRITE);
     try (RpcContext rpcContext = createRpcContext();
         LockedInodePath inodePath = mInodeTree.lockFullInodePath(path, InodeTree.LockMode.WRITE)) {
-      mInodeTree.getState().applyAndJournal(rpcContext, UpdateInodeEntry.newBuilder()
+      mInodeTree.updateInode(rpcContext, UpdateInodeEntry.newBuilder()
           .setId(inodePath.getInode().getId())
           .setPersistenceState(PersistenceState.TO_BE_PERSISTED.name())
           .build());
@@ -3651,7 +3641,7 @@ public final class DefaultFileSystemMaster extends AbstractMaster implements Fil
     if (modeChanged) {
       entry.setMode(options.getMode());
     }
-    mInodeTree.getState().applyAndJournal(rpcContext, entry.build());
+    mInodeTree.updateInode(rpcContext, entry.build());
   }
 
   /**

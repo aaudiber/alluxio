@@ -15,10 +15,16 @@ import alluxio.collections.FieldIndex;
 import alluxio.master.file.meta.Inode;
 import alluxio.master.file.meta.InodeView;
 
+/**
+ * Read-only access to the inodes index.
+ */
 public class InodesView {
   /** Use UniqueFieldIndex directly for ID index rather than using IndexedSet. */
   private final FieldIndex<Inode<?>> mInodes;
 
+  /**
+   * @param inodes the inodes to create a view for
+   */
   public InodesView(FieldIndex<Inode<?>> inodes) {
     mInodes = inodes;
   }

@@ -15,6 +15,9 @@ import alluxio.exception.BlockInfoException;
 
 import java.util.List;
 
+/**
+ * Read-only interface for an inode file.
+ */
 public interface InodeFileView extends InodeView {
 
   /**

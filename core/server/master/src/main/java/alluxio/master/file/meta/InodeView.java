@@ -24,6 +24,9 @@ import alluxio.wire.TtlAction;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Read-only view of an inode.
+ */
 public interface InodeView extends JournalEntryRepresentable {
 
   /**

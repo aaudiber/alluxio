@@ -17,7 +17,6 @@ import alluxio.exception.FileDoesNotExistException;
 import alluxio.heartbeat.HeartbeatExecutor;
 import alluxio.master.ProtobufUtils;
 import alluxio.master.file.meta.InodeTree;
-import alluxio.master.file.meta.InodeTreePersistentState;
 import alluxio.master.file.meta.InodeView;
 import alluxio.master.file.meta.LockedInodePath;
 import alluxio.master.file.meta.TtlBucket;
@@ -45,7 +44,6 @@ final class InodeTtlChecker implements HeartbeatExecutor {
   private final FileSystemMaster mFileSystemMaster;
   private final InodeTree mInodeTree;
   private final TtlBucketList mTtlBuckets;
-  private final InodeTreePersistentState mState;
 
   /**
    * Constructs a new {@link InodeTtlChecker}.
@@ -54,7 +52,6 @@ final class InodeTtlChecker implements HeartbeatExecutor {
     mFileSystemMaster = fileSystemMaster;
     mInodeTree = inodeTree;
     mTtlBuckets = inodeTree.getTtlBuckets();
-    mState = mInodeTree.getState();
   }
 
   @Override
@@ -89,7 +86,7 @@ final class InodeTtlChecker implements HeartbeatExecutor {
                 }
                 try (JournalContext journalContext = mFileSystemMaster.createJournalContext()) {
                   // Reset state
-                  mState.applyAndJournal(journalContext, UpdateInodeEntry.newBuilder()
+                  mInodeTree.updateInode(journalContext, UpdateInodeEntry.newBuilder()
                       .setId(inode.getId())
                       .setTtl(Constants.NO_TTL)
                       .setTtlAction(ProtobufUtils.toProtobuf(TtlAction.DELETE))

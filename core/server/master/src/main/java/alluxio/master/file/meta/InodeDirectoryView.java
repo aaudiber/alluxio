@@ -17,6 +17,9 @@ import java.util.Set;
 
 import javax.annotation.Nullable;
 
+/**
+ * Read-only interface for an inode directory.
+ */
 public interface InodeDirectoryView extends InodeView {
 
   /**

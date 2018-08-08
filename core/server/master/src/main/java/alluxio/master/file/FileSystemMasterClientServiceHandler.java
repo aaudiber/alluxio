@@ -176,9 +176,10 @@ public final class FileSystemMasterClientServiceHandler implements
   public GetNewBlockIdForFileTResponse getNewBlockIdForFile(final String path,
       final GetNewBlockIdForFileTOptions options) throws AlluxioTException {
     return RpcUtils.call(LOG,
-        (RpcCallableThrowsIOException<GetNewBlockIdForFileTResponse>) () -> new GetNewBlockIdForFileTResponse(
-            mFileSystemMaster.getNewBlockIdForFile(new AlluxioURI(path))), "GetNewBlockIdForFile",
-        "path=%s, options=%s", path, options);
+        (RpcCallableThrowsIOException<GetNewBlockIdForFileTResponse>) () ->
+            new GetNewBlockIdForFileTResponse(
+                mFileSystemMaster.getNewBlockIdForFile(new AlluxioURI(path))),
+        "GetNewBlockIdForFile", "path=%s, options=%s", path, options);
   }
 
   @Override

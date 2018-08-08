@@ -41,10 +41,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Supplier;
 
+/**
+ * Class for managing peristent inode tree state.
+ *
+ * This class owns all persistent inode tree state, and all inode tree modifications must go through
+ * this class. The getInodesView and getRoot methods expose unmodifiable views of the inode tree.
+ * To modify the inode tree, create a journal entry and call one of the applyAndJournal methods.
+ */
 public class InodeTreePersistentState {
   private static final Logger LOG = LoggerFactory.getLogger(InodeTreePersistentState.class);
 
@@ -76,6 +84,9 @@ public class InodeTreePersistentState {
     return mInodesView;
   }
 
+  /**
+   * @return the root of the inode tree
+   */
   public InodeDirectoryView getRoot() {
     return mRoot;
   }
@@ -84,7 +95,6 @@ public class InodeTreePersistentState {
    * @return the TTL bucket list
    */
   public TtlBucketList getTtlBucketList() {
-    // TODO: replace with unmodifiable view
     return mTtlBuckets;
   }
 
@@ -92,8 +102,7 @@ public class InodeTreePersistentState {
    * @return the pinned inode file ids;
    */
   public Set<Long> getPinnedInodeFileIds() {
-    // TODO: replace with unmodifiable view
-    return mPinnedInodeFileIds;
+    return Collections.unmodifiableSet(mPinnedInodeFileIds);
   }
 
   /**
@@ -103,23 +112,42 @@ public class InodeTreePersistentState {
    * @param entry the entry
    */
   public void apply(JournalEntry entry) {
-    if (entry.hasDeleteFile()) apply(entry.getDeleteFile());
-    if (entry.hasInodeDirectory()) apply(entry.getInodeDirectory());
-    if (entry.hasInodeFile()) apply(entry.getInodeFile());
-    if (entry.hasRename()) apply(entry.getRename());
-    if (entry.hasSetAcl()) apply(entry.getSetAcl());
-    if (entry.hasUpdateInode()) apply(entry.getUpdateInode());
-    if (entry.hasUpdateInodeDirectory()) apply(entry.getUpdateInodeDirectory());
-    if (entry.hasUpdateInodeFile()) apply(entry.getUpdateInodeFile());
-
-    // Deprecated entries
-    if (entry.hasAsyncPersistRequest()) apply(entry.getAsyncPersistRequest());
-    if (entry.hasCompleteFile()) apply(entry.getCompleteFile());
-    if (entry.hasInodeLastModificationTime()) apply(entry.getInodeLastModificationTime());
-    if (entry.hasPersistDirectory()) apply(entry.getPersistDirectory());
-    if (entry.hasReinitializeFile()) apply(entry.getReinitializeFile());
+    if (entry.hasDeleteFile()) {
+      apply(entry.getDeleteFile());
+    } else if (entry.hasInodeDirectory()) {
+      apply(entry.getInodeDirectory());
+    } else if (entry.hasInodeFile()) {
+      apply(entry.getInodeFile());
+    } else if (entry.hasRename()) {
+      apply(entry.getRename());
+    } else if (entry.hasSetAcl()) {
+      apply(entry.getSetAcl());
+    } else if (entry.hasUpdateInode()) {
+      apply(entry.getUpdateInode());
+    } else if (entry.hasUpdateInodeDirectory()) {
+      apply(entry.getUpdateInodeDirectory());
+    } else if (entry.hasUpdateInodeFile()) {
+      apply(entry.getUpdateInodeFile());
+      // Deprecated entries
+    } else if (entry.hasAsyncPersistRequest()) {
+      apply(entry.getAsyncPersistRequest());
+    } else if (entry.hasCompleteFile()) {
+      apply(entry.getCompleteFile());
+    } else if (entry.hasInodeLastModificationTime()) {
+      apply(entry.getInodeLastModificationTime());
+    } else if (entry.hasPersistDirectory()) {
+      apply(entry.getPersistDirectory());
+    } else if (entry.hasReinitializeFile()) {
+      apply(entry.getReinitializeFile());
+    } else {
+      throw new IllegalStateException("Unrecognized journal entry: " + entry);
+    }
   }
 
+  /**
+   * @param context journal context supplier
+   * @param entry delete file entry
+   */
   public void applyAndJournal(Supplier<JournalContext> context, DeleteFileEntry entry) {
     context.get().append(JournalEntry.newBuilder().setDeleteFile(entry).build());
     try {
@@ -145,27 +173,45 @@ public class InodeTreePersistentState {
     return false;
   }
 
+  /**
+   * @param context journal context supplier
+   * @param entry set acl entry
+   */
   public void applyAndJournal(Supplier<JournalContext> context, SetAclEntry entry) {
     apply(entry);
     context.get().append(JournalEntry.newBuilder().setSetAcl(entry).build());
   }
 
+  /**
+   * @param context journal context supplier
+   * @param entry update inode entry
+   */
   public void applyAndJournal(Supplier<JournalContext> context, UpdateInodeEntry entry) {
     apply(entry);
     context.get().append(JournalEntry.newBuilder().setUpdateInode(entry).build());
   }
 
+  /**
+   * @param context journal context supplier
+   * @param entry update inode directory entry
+   */
   public void applyAndJournal(Supplier<JournalContext> context, UpdateInodeDirectoryEntry entry) {
     apply(entry);
     context.get().append(JournalEntry.newBuilder().setUpdateInodeDirectory(entry).build());
   }
 
+  /**
+   * @param context journal context supplier
+   * @param entry update inode file entry
+   */
   public void applyAndJournal(Supplier<JournalContext> context, UpdateInodeFileEntry entry) {
     apply(entry);
     context.get().append(JournalEntry.newBuilder().setUpdateInodeFile(entry).build());
   }
 
   /**
+   * @param context journal context supplier
+   * @param inode an inode to add and create a journal entry for
    * @return whether the inode was successfully added. Returns false if another inode was
    *         concurrently added with the same name. On false return, no state is changed,
    *         and no journal entry is written
@@ -359,6 +405,9 @@ public class InodeTreePersistentState {
     throw new UnsupportedOperationException("Lineage is not currently supported");
   }
 
+  /**
+   * Resets the inode tree state.
+   */
   public void reset() {
     mRoot = null;
     mInodes.clear();

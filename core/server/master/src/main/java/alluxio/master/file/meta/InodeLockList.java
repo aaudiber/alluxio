@@ -77,8 +77,8 @@ public class InodeLockList implements AutoCloseable {
    * @param name the expected name of the inode to be locked
    * @throws InvalidPathException if the inode is not consistent with the caller's expectations
    */
-  public synchronized void lockReadAndCheckNameAndParent(InodeView inode, InodeView parent, String name)
-      throws InvalidPathException {
+  public synchronized void lockReadAndCheckNameAndParent(InodeView inode, InodeView parent,
+      String name) throws InvalidPathException {
     inode.lockReadAndCheckNameAndParent(parent, name);
     mInodes.add(inode);
     mLockModes.add(InodeTree.LockMode.READ);
@@ -159,8 +159,8 @@ public class InodeLockList implements AutoCloseable {
    * @param name the expected name of the inode to be locked
    * @throws InvalidPathException if the inode is not consistent with the caller's expectations
    */
-  public synchronized void lockWriteAndCheckNameAndParent(InodeView inode, InodeView parent, String name)
-      throws InvalidPathException {
+  public synchronized void lockWriteAndCheckNameAndParent(InodeView inode, InodeView parent,
+      String name) throws InvalidPathException {
     inode.lockWriteAndCheckNameAndParent(parent, name);
     mInodes.add(inode);
     mLockModes.add(InodeTree.LockMode.WRITE);

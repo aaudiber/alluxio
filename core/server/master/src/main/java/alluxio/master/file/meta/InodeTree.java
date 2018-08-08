@@ -30,7 +30,11 @@ import alluxio.master.file.state.InodesView;
 import alluxio.master.journal.JournalContext;
 import alluxio.master.journal.JournalEntryIterable;
 import alluxio.proto.journal.File.DeleteFileEntry;
+import alluxio.proto.journal.File.RenameEntry;
+import alluxio.proto.journal.File.SetAclEntry;
+import alluxio.proto.journal.File.UpdateInodeDirectoryEntry;
 import alluxio.proto.journal.File.UpdateInodeEntry;
+import alluxio.proto.journal.File.UpdateInodeFileEntry;
 import alluxio.proto.journal.Journal;
 import alluxio.proto.journal.Journal.JournalEntry;
 import alluxio.resource.CloseableResource;
@@ -60,6 +64,7 @@ import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
+import java.util.function.Supplier;
 
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.NotThreadSafe;
@@ -159,16 +164,64 @@ public class InodeTree implements JournalEntryIterable {
     }
   }
 
+  /**
+   * @param entry an entry to apply to the inode tree
+   */
   public void apply(JournalEntry entry) {
     mState.apply(entry);
   }
 
-  public InodeTreePersistentState getState() {
-    return mState;
-  }
-
+  /**
+   * @return the list of TTL buckets for tracking inode TTLs
+   */
   public TtlBucketList getTtlBuckets() {
     return mState.getTtlBucketList();
+  }
+
+  /**
+   * Marks an inode directory as having its direct children loaded.
+   *
+   * @param context journal context supplier
+   * @param id the inode directory id
+   */
+  public void setDirectChildrenLoaded(Supplier<JournalContext> context, long id) {
+    mState.applyAndJournal(context, UpdateInodeDirectoryEntry.newBuilder()
+        .setId(id)
+        .setDirectChildrenLoaded(true)
+        .build());
+  }
+
+  /**
+   * @param context journal context supplier
+   * @param entry an entry representing an update inode file operation
+   */
+  public void updateInodeFile(Supplier<JournalContext> context, UpdateInodeFileEntry entry) {
+    mState.applyAndJournal(context, entry);
+  }
+
+  /**
+   * @param context journal context supplier
+   * @param entry an entry representing an update inode operation
+   */
+  public void updateInode(Supplier<JournalContext> context, UpdateInodeEntry entry) {
+    mState.applyAndJournal(context, entry);
+  }
+
+  /**
+   * @param context journal context supplier
+   * @param entry an entry representing a rename operation
+   * @return whether the operation succeeded
+   */
+  public boolean rename(Supplier<JournalContext> context, RenameEntry entry) {
+    return mState.applyAndJournal(context, entry);
+  }
+
+  /**
+   * @param context journal context supplier
+   * @param entry an entry representing a set acl operation
+   */
+  public void setAcl(Supplier<JournalContext> context, SetAclEntry entry) {
+    mState.applyAndJournal(context, entry);
   }
 
   /**
@@ -902,7 +955,6 @@ public class InodeTree implements JournalEntryIterable {
         .setOpTimeMs(opTimeMs)
         .build());
 
-
     if (inode.isFile()) {
       rpcContext.getBlockDeletionContext()
           .registerBlocksForDeletion(((InodeFileView) inode).getBlockIds());
@@ -919,8 +971,8 @@ public class InodeTree implements JournalEntryIterable {
    * @param opTimeMs the operation time
    * @throws FileDoesNotExistException if inode does not exist
    */
-  public void setPinned(RpcContext rpcContext, LockedInodePath inodePath, boolean pinned, long opTimeMs)
-      throws FileDoesNotExistException {
+  public void setPinned(RpcContext rpcContext, LockedInodePath inodePath, boolean pinned,
+      long opTimeMs) throws FileDoesNotExistException {
     InodeView inode = inodePath.getInode();
 
     mState.applyAndJournal(rpcContext, UpdateInodeEntry.newBuilder()
@@ -978,7 +1030,8 @@ public class InodeTree implements JournalEntryIterable {
    * @return true if the given file id is the root id
    */
   public boolean isRootId(long fileId) {
-    Preconditions.checkNotNull(mState.getRoot(), PreconditionMessage.INODE_TREE_UNINITIALIZED_IS_ROOT_ID);
+    Preconditions.checkNotNull(mState.getRoot(),
+        PreconditionMessage.INODE_TREE_UNINITIALIZED_IS_ROOT_ID);
     return fileId == mState.getRoot().getId();
   }
 
@@ -1364,6 +1417,9 @@ public class InodeTree implements JournalEntryIterable {
     }
   }
 
+  /**
+   * Resets the inode tree state.
+   */
   public void reset() {
     mState.reset();
   }
