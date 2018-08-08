@@ -155,6 +155,15 @@ public class InodeTree implements JournalEntryIterable {
           NO_PARENT, ROOT_INODE_NAME,
           CreateDirectoryOptions.defaults().setOwner(owner).setGroup(group).setMode(mode));
       mState.applyAndJournal(context, root);
+      root.lockWrite();
+      try {
+        syncPersistExistingDirectory(context, root);
+      } catch (Throwable e) {
+        throw new RuntimeException(
+            String.format("Failed to create root directory in UFS: %s", e.toString(), e));
+      } finally {
+        root.unlockWrite();
+      }
     }
   }
 
@@ -1036,7 +1045,7 @@ public class InodeTree implements JournalEntryIterable {
    * @throws InvalidPathException if the path for the inode is invalid
    * @throws FileDoesNotExistException if the path for the inode is invalid
    */
-  public void syncPersistExistingDirectory(RpcContext rpcContext, InodeDirectoryView dir)
+  public void syncPersistExistingDirectory(Supplier<JournalContext> context, InodeDirectoryView dir)
       throws IOException, InvalidPathException, FileDoesNotExistException {
     Preconditions.checkState(mInodes.containsId(dir.getId()));
     RetryPolicy retry =
@@ -1071,7 +1080,7 @@ public class InodeTree implements JournalEntryIterable {
         });
         entry.setPersistenceState(PersistenceState.PERSISTED.name());
 
-        mState.applyAndJournal(rpcContext, entry.build());
+        mState.applyAndJournal(context, entry.build());
         return;
       }
     }
