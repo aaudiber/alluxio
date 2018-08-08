@@ -126,12 +126,6 @@ public class InodeTree implements JournalEntryIterable {
   private final InodeDirectoryIdGenerator mDirectoryIdGenerator;
 
   /**
-   * This is only used for adding inodes from the journal, to prevent repeated lookups of the same
-   * inode.
-   */
-  private InodeDirectory mCachedInode;
-
-  /**
    * @param containerIdGenerator the container id generator to use to get new container ids
    * @param directoryIdGenerator the directory id generator to use to get new directory ids
    * @param mountTable the mount table to manage the file system mount points
@@ -1147,7 +1141,7 @@ public class InodeTree implements JournalEntryIterable {
   @Override
   public int hashCode() {
     return Objects.hashCode(mInodes, mPinnedInodeFileIds, mContainerIdGenerator,
-        mDirectoryIdGenerator, mCachedInode);
+        mDirectoryIdGenerator);
   }
 
   @Override
@@ -1162,8 +1156,7 @@ public class InodeTree implements JournalEntryIterable {
     return Objects.equal(mInodes, that.mInodes)
         && Objects.equal(mPinnedInodeFileIds, that.mPinnedInodeFileIds)
         && Objects.equal(mContainerIdGenerator, that.mContainerIdGenerator)
-        && Objects.equal(mDirectoryIdGenerator, that.mDirectoryIdGenerator)
-        && Objects.equal(mCachedInode, that.mCachedInode);
+        && Objects.equal(mDirectoryIdGenerator, that.mDirectoryIdGenerator);
   }
 
   /**
