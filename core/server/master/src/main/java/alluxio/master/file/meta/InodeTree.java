@@ -154,16 +154,8 @@ public class InodeTree implements JournalEntryIterable {
       InodeDirectory root = InodeDirectory.create(mDirectoryIdGenerator.getNewDirectoryId(context),
           NO_PARENT, ROOT_INODE_NAME,
           CreateDirectoryOptions.defaults().setOwner(owner).setGroup(group).setMode(mode));
+      root.setPersistenceState(PersistenceState.PERSISTED);
       mState.applyAndJournal(context, root);
-      root.lockWrite();
-      try {
-        syncPersistExistingDirectory(context, root);
-      } catch (Throwable e) {
-        throw new RuntimeException(
-            String.format("Failed to create root directory in UFS: %s", e.toString(), e));
-      } finally {
-        root.unlockWrite();
-      }
     }
   }
 
