@@ -89,7 +89,6 @@ import alluxio.proto.journal.File.AddMountPointEntry;
 import alluxio.proto.journal.File.DeleteMountPointEntry;
 import alluxio.proto.journal.File.RenameEntry;
 import alluxio.proto.journal.File.SetAclEntry;
-import alluxio.proto.journal.File.SetAttributeEntry;
 import alluxio.proto.journal.File.StringPairEntry;
 import alluxio.proto.journal.File.UpdateInodeEntry;
 import alluxio.proto.journal.File.UpdateInodeFileEntry;
@@ -2339,8 +2338,6 @@ public final class DefaultFileSystemMaster extends AbstractMaster implements Fil
             SetAttributeOptions setAttributeOptions =
                 SetAttributeOptions.defaults().setRecursive(false).setPinned(false);
             setAttributeInternal(rpcContext, descedant, false, opTimeMs, setAttributeOptions);
-            journalSetAttribute(descedant, opTimeMs, setAttributeOptions,
-                rpcContext.getJournalContext());
           }
           // Remove corresponding blocks from workers.
           mBlockMaster.removeBlocks(((InodeFileView) freeInode).getBlockIds(), false /* delete */);
@@ -3188,49 +3185,10 @@ public final class DefaultFileSystemMaster extends AbstractMaster implements Fil
         }
         for (LockedInodePath childPath : descendants.getInodePathList()) {
           setAttributeInternal(rpcContext, childPath, false, opTimeMs, options);
-          journalSetAttribute(childPath, opTimeMs, options, rpcContext.getJournalContext());
         }
       }
     }
     setAttributeInternal(rpcContext, inodePath, false, opTimeMs, options);
-    journalSetAttribute(inodePath, opTimeMs, options, rpcContext.getJournalContext());
-  }
-
-  /**
-   * @param inodePath the file path to use
-   * @param opTimeMs the operation time (in milliseconds)
-   * @param options the method options
-   * @param journalContext the journal context
-   * @throws FileDoesNotExistException if path does not exist
-   */
-  private void journalSetAttribute(LockedInodePath inodePath, long opTimeMs,
-      SetAttributeOptions options, JournalContext journalContext) throws FileDoesNotExistException {
-    SetAttributeEntry.Builder builder =
-        SetAttributeEntry.newBuilder().setId(inodePath.getInode().getId()).setOpTimeMs(opTimeMs);
-    if (options.getPinned() != null) {
-      builder.setPinned(options.getPinned());
-    }
-    if (options.getTtl() != null) {
-      builder.setTtl(options.getTtl());
-      builder.setTtlAction(ProtobufUtils.toProtobuf(options.getTtlAction()));
-    }
-
-    if (options.getPersisted() != null) {
-      builder.setPersisted(options.getPersisted());
-    }
-    if (options.getOwner() != null) {
-      builder.setOwner(options.getOwner());
-    }
-    if (options.getGroup() != null) {
-      builder.setGroup(options.getGroup());
-    }
-    if (options.getMode() != Constants.INVALID_MODE) {
-      builder.setPermission(options.getMode());
-    }
-    if (!options.getUfsFingerprint().equals(Constants.INVALID_UFS_FINGERPRINT)) {
-      builder.setUfsFingerprint(options.getUfsFingerprint());
-    }
-    journalContext.append(JournalEntry.newBuilder().setSetAttribute(builder).build());
   }
 
   @Override
@@ -3246,18 +3204,6 @@ public final class DefaultFileSystemMaster extends AbstractMaster implements Fil
     }
     // NOTE: persistence is asynchronous so there is no guarantee the path will still exist
     mAsyncPersistHandler.scheduleAsyncPersistence(path);
-  }
-
-  /**
-   * Schedules a file for async persistence.
-   * <p>
-   * Writes to the journal.
-   *
-   * @param rpcContext the rpc context
-   * @param inodePath the {@link LockedInodePath} of the file for persistence
-   */
-  private void scheduleAsyncPersistenceAndJournal(RpcContext rpcContext, LockedInodePath inodePath)
-      throws AlluxioException {
   }
 
   /**
@@ -3437,7 +3383,6 @@ public final class DefaultFileSystemMaster extends AbstractMaster implements Fil
           long opTimeMs = System.currentTimeMillis();
           // use replayed, since updating UFS is not desired.
           setAttributeInternal(rpcContext, inodePath, true, opTimeMs, options);
-          journalSetAttribute(inodePath, opTimeMs, options, rpcContext.getJournalContext());
         }
       }
       if (syncPlan.toDelete()) {
@@ -3642,44 +3587,6 @@ public final class DefaultFileSystemMaster extends AbstractMaster implements Fil
       entry.setMode(options.getMode());
     }
     mInodeTree.updateInode(rpcContext, entry.build());
-  }
-
-  /**
-   * @param entry the entry to use
-   * @throws FileDoesNotExistException if the file does not exist
-   * @throws InvalidPathException if the file path corresponding to the file id is invalid
-   * @throws AccessControlException if failed to set permission
-   */
-  private void setAttributeFromEntry(SetAttributeEntry entry)
-      throws FileDoesNotExistException, InvalidPathException, AccessControlException {
-    SetAttributeOptions options = SetAttributeOptions.defaults();
-    if (entry.hasPinned()) {
-      options.setPinned(entry.getPinned());
-    }
-    if (entry.hasTtl()) {
-      options.setTtl(entry.getTtl());
-      options.setTtlAction(ProtobufUtils.fromProtobuf(entry.getTtlAction()));
-    }
-    if (entry.hasPersisted()) {
-      options.setPersisted(entry.getPersisted());
-    }
-    if (entry.hasOwner()) {
-      options.setOwner(entry.getOwner());
-    }
-    if (entry.hasGroup()) {
-      options.setGroup(entry.getGroup());
-    }
-    if (entry.hasPermission()) {
-      options.setMode((short) entry.getPermission());
-    }
-    if (entry.hasUfsFingerprint()) {
-      options.setUfsFingerprint(entry.getUfsFingerprint());
-    }
-    try (LockedInodePath inodePath = mInodeTree
-        .lockFullInodePath(entry.getId(), InodeTree.LockMode.WRITE)) {
-      setAttributeInternal(RpcContext.NOOP, inodePath, true, entry.getOpTimeMs(), options);
-      // Intentionally not journaling the persisted inodes from setAttributeInternal
-    }
   }
 
   @Override
