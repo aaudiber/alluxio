@@ -168,7 +168,7 @@ public class InodeTree implements JournalEntryIterable {
    * @param entry an entry to apply to the inode tree
    */
   public void apply(JournalEntry entry) {
-    mState.apply(entry);
+    mState.applyJournalEntry(entry);
   }
 
   /**
@@ -946,8 +946,6 @@ public class InodeTree implements JournalEntryIterable {
           ExceptionMessage.INODE_DOES_NOT_EXIST.getMessage(inode.getParentId()));
     }
 
-    // Journal before removing the inode from the parent, since the parent is read locked.
-    // TODO(andrew) Why was this necessary? ^
     mState.applyAndJournal(rpcContext, DeleteFileEntry.newBuilder()
         .setId(inode.getId())
         .setAlluxioOnly(deleteOptions.isAlluxioOnly())

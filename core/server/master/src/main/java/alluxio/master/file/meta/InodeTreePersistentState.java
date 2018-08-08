@@ -111,7 +111,7 @@ public class InodeTreePersistentState {
    *
    * @param entry the entry
    */
-  public void apply(JournalEntry entry) {
+  public void applyJournalEntry(JournalEntry entry) {
     if (entry.hasDeleteFile()) {
       apply(entry.getDeleteFile());
     } else if (entry.hasInodeDirectory()) {
@@ -161,6 +161,8 @@ public class InodeTreePersistentState {
   }
 
   /**
+   * @param context journal context supplier
+   * @param entry rename entry
    * @return whether the inode was successfully renamed. Returns false if another inode was
    *         concurrently added with the same name. On false return, no state is changed,
    *         and no journal entry is written
@@ -249,60 +251,8 @@ public class InodeTreePersistentState {
     }
   }
 
-  /**
-   * @return whether the inode was successfully added. Returns false if another inode was
-   *         concurrently added with the same name. On false return, no state is changed, and no
-   *         journal entry is written
-   **/
-  private boolean applyInode(Inode<?> inode) {
-    if (inode.isDirectory() && inode.getName().equals(InodeTree.ROOT_INODE_NAME)) {
-      // This is the root inode. Clear all the state, and set the root.
-      mInodes.clear();
-      mInodes.add(inode);
-      mPinnedInodeFileIds.clear();
-      mRoot = (InodeDirectory) inode;
-      return true;
-    }
-    mInodes.add(inode);
-    InodeDirectory parent = (InodeDirectory) mInodes.getFirst(inode.getParentId());
-    if (!parent.addChild(inode)) {
-      LOG.info("Failed to add {} ({})", inode.getName(), inode.getId());
-      mInodes.remove(inode);
-      return false;
-    }
-    // Update indexes.
-    if (inode.isFile() && inode.isPinned()) {
-      mPinnedInodeFileIds.add(inode.getId());
-    }
-    // Add the file to TTL buckets, the insert automatically rejects files w/ Constants.NO_TTL
-    mTtlBuckets.insert(inode);
-    return true;
-  }
-
   private void apply(RenameEntry entry) {
     Preconditions.checkState(applyRename(entry));
-  }
-
-  private boolean applyRename(RenameEntry entry) {
-    Inode<?> inode = mInodes.getFirst(entry.getId());
-    String oldName = inode.getName();
-    InodeDirectory parent = (InodeDirectory) mInodes.getFirst(inode.getParentId());
-    parent.removeChild(inode);
-
-    inode.setName(entry.getNewName());
-    InodeDirectory newParent = (InodeDirectory) mInodes.getFirst(entry.getNewParentId());
-    if (!newParent.addChild(inode)) {
-      // Parents index their children by name, so we need to update the name before adding/removing.
-      // In the future, we should consider indexing by ID instead to simplify this code and also
-      // save memory.
-      inode.setName(oldName);
-      parent.addChild(inode);
-      return false;
-    }
-    inode.setParentId(entry.getNewParentId());
-    parent.setLastModificationTimeMs(entry.getOpTimeMs());
-    newParent.setLastModificationTimeMs(entry.getOpTimeMs());
-    return true;
   }
 
   private void apply(SetAclEntry entry) {
@@ -320,7 +270,7 @@ public class InodeTreePersistentState {
         try {
           inode.removeAcl(entries);
         } catch (IOException e) {
-          // TODO: check that removeAcl is legal before applying the journal entry.
+          // TODO(andrew): check that removeAcl is legal before applying the journal entry.
           throw new RuntimeException(e);
         }
         break;
@@ -403,6 +353,57 @@ public class InodeTreePersistentState {
 
   private void apply(ReinitializeFileEntry entry) {
     throw new UnsupportedOperationException("Lineage is not currently supported");
+  }
+
+  ////
+  // Helper methods
+  ////
+
+  private boolean applyInode(Inode<?> inode) {
+    if (inode.isDirectory() && inode.getName().equals(InodeTree.ROOT_INODE_NAME)) {
+      // This is the root inode. Clear all the state, and set the root.
+      mInodes.clear();
+      mInodes.add(inode);
+      mPinnedInodeFileIds.clear();
+      mRoot = (InodeDirectory) inode;
+      return true;
+    }
+    mInodes.add(inode);
+    InodeDirectory parent = (InodeDirectory) mInodes.getFirst(inode.getParentId());
+    if (!parent.addChild(inode)) {
+      LOG.info("Failed to add {} ({})", inode.getName(), inode.getId());
+      mInodes.remove(inode);
+      return false;
+    }
+    // Update indexes.
+    if (inode.isFile() && inode.isPinned()) {
+      mPinnedInodeFileIds.add(inode.getId());
+    }
+    // Add the file to TTL buckets, the insert automatically rejects files w/ Constants.NO_TTL
+    mTtlBuckets.insert(inode);
+    return true;
+  }
+
+  private boolean applyRename(RenameEntry entry) {
+    Inode<?> inode = mInodes.getFirst(entry.getId());
+    String oldName = inode.getName();
+    InodeDirectory parent = (InodeDirectory) mInodes.getFirst(inode.getParentId());
+    parent.removeChild(inode);
+
+    inode.setName(entry.getNewName());
+    InodeDirectory newParent = (InodeDirectory) mInodes.getFirst(entry.getNewParentId());
+    if (!newParent.addChild(inode)) {
+      // Parents index their children by name, so we need to update the name before adding/removing.
+      // In the future, we should consider indexing by ID instead to simplify this code and also
+      // save memory.
+      inode.setName(oldName);
+      parent.addChild(inode);
+      return false;
+    }
+    inode.setParentId(entry.getNewParentId());
+    parent.setLastModificationTimeMs(entry.getOpTimeMs());
+    newParent.setLastModificationTimeMs(entry.getOpTimeMs());
+    return true;
   }
 
   /**

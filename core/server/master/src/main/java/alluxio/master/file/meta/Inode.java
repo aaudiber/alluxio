@@ -437,7 +437,8 @@ public abstract class Inode<T> implements InodeView {
   }
 
   @Override
-  public void lockReadAndCheckNameAndParent(InodeView parent, String name) throws InvalidPathException {
+  public void lockReadAndCheckNameAndParent(InodeView parent, String name)
+      throws InvalidPathException {
     lockReadAndCheckParent(parent);
     if (!mName.equals(name)) {
       unlockRead();
