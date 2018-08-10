@@ -168,7 +168,7 @@ public class InodeTreePersistentState implements JournalEntryReplayable {
    * @param context journal context supplier
    * @param entry delete file entry
    */
-  public void applyAndJournal(Supplier<JournalContext> context, DeleteFileEntry entry) {
+  public synchronized void applyAndJournal(Supplier<JournalContext> context, DeleteFileEntry entry) {
     // Unlike most entries, the delete file entry must be applied *before* making the in-memory
     // change. This is because delete file and create file are performed with only a read lock on
     // the parent directory. As soon as we do the in-memory-delete, another thread could re-create a
@@ -195,7 +195,7 @@ public class InodeTreePersistentState implements JournalEntryReplayable {
    * @param entry new block entry
    * @return the new block id
    */
-  public long applyAndJournal(Supplier<JournalContext> context, NewBlockEntry entry) {
+  public synchronized long applyAndJournal(Supplier<JournalContext> context, NewBlockEntry entry) {
     long id = apply(entry);
     context.get().append(JournalEntry.newBuilder().setNewBlock(entry).build());
     return id;
@@ -210,7 +210,7 @@ public class InodeTreePersistentState implements JournalEntryReplayable {
    *         concurrently added with the same name. On false return, no state is changed,
    *         and no journal entry is written
    */
-  public boolean applyAndJournal(Supplier<JournalContext> context, RenameEntry entry) {
+  public synchronized boolean applyAndJournal(Supplier<JournalContext> context, RenameEntry entry) {
     if (applyRename(entry)) {
       context.get().append(JournalEntry.newBuilder().setRename(entry).build());
       return true;
@@ -224,7 +224,7 @@ public class InodeTreePersistentState implements JournalEntryReplayable {
    * @param context journal context supplier
    * @param entry set acl entry
    */
-  public void applyAndJournal(Supplier<JournalContext> context, SetAclEntry entry) {
+  public synchronized void applyAndJournal(Supplier<JournalContext> context, SetAclEntry entry) {
     apply(entry);
     context.get().append(JournalEntry.newBuilder().setSetAcl(entry).build());
   }
@@ -235,7 +235,7 @@ public class InodeTreePersistentState implements JournalEntryReplayable {
    * @param context journal context supplier
    * @param entry update inode entry
    */
-  public void applyAndJournal(Supplier<JournalContext> context, UpdateInodeEntry entry) {
+  public synchronized void applyAndJournal(Supplier<JournalContext> context, UpdateInodeEntry entry) {
     apply(entry);
     context.get().append(JournalEntry.newBuilder().setUpdateInode(entry).build());
   }
@@ -246,7 +246,7 @@ public class InodeTreePersistentState implements JournalEntryReplayable {
    * @param context journal context supplier
    * @param entry update inode directory entry
    */
-  public void applyAndJournal(Supplier<JournalContext> context, UpdateInodeDirectoryEntry entry) {
+  public synchronized void applyAndJournal(Supplier<JournalContext> context, UpdateInodeDirectoryEntry entry) {
     apply(entry);
     context.get().append(JournalEntry.newBuilder().setUpdateInodeDirectory(entry).build());
   }
@@ -257,7 +257,7 @@ public class InodeTreePersistentState implements JournalEntryReplayable {
    * @param context journal context supplier
    * @param entry update inode file entry
    */
-  public void applyAndJournal(Supplier<JournalContext> context, UpdateInodeFileEntry entry) {
+  public synchronized void applyAndJournal(Supplier<JournalContext> context, UpdateInodeFileEntry entry) {
     apply(entry);
     context.get().append(JournalEntry.newBuilder().setUpdateInodeFile(entry).build());
   }
@@ -271,7 +271,7 @@ public class InodeTreePersistentState implements JournalEntryReplayable {
    *         concurrently added with the same name. On false return, no state is changed,
    *         and no journal entry is written
    */
-  public boolean applyAndJournal(Supplier<JournalContext> context, Inode<?> inode) {
+  public synchronized boolean applyAndJournal(Supplier<JournalContext> context, Inode<?> inode) {
     if (applyInode(inode)) {
       context.get().append(inode.toJournalEntry());
       return true;
