@@ -14,8 +14,14 @@ package alluxio.master.file.meta;
 import alluxio.AlluxioURI;
 import alluxio.master.file.meta.options.MountInfo;
 import alluxio.master.file.options.MountOptions;
+<<<<<<< HEAD
 import alluxio.master.journal.NoopJournalContext;
 import alluxio.underfs.MasterUfsManager;
+||||||| parent of f164aa9e7d... WIP
+import alluxio.underfs.MasterUfsManager;
+=======
+import alluxio.underfs.MasterUfsClientFecther;
+>>>>>>> f164aa9e7d... WIP
 import alluxio.underfs.UfsManager;
 import alluxio.underfs.UnderFileSystem;
 import alluxio.underfs.UnderFileSystemConfiguration;
@@ -49,7 +55,7 @@ public class LazyUfsBlockLocationCacheTest {
     mLocalUfs = UnderFileSystem.Factory.create(mLocalUfsPath);
 
     mMountId = IdUtils.getRandomNonNegativeLong();
-    mUfsManager = new MasterUfsManager();
+    mUfsManager = new MasterUfsClientFecther();
     MountOptions options = MountOptions.defaults();
     mUfsManager.addMount(mMountId, new AlluxioURI(mLocalUfsPath),
         UnderFileSystemConfiguration.defaults().setReadOnly(options.isReadOnly())

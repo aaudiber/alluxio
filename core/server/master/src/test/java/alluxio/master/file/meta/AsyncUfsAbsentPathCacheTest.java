@@ -14,8 +14,14 @@ package alluxio.master.file.meta;
 import alluxio.AlluxioURI;
 import alluxio.master.file.meta.options.MountInfo;
 import alluxio.master.file.options.MountOptions;
+<<<<<<< HEAD
 import alluxio.master.journal.NoopJournalContext;
 import alluxio.underfs.MasterUfsManager;
+||||||| parent of f164aa9e7d... WIP
+import alluxio.underfs.MasterUfsManager;
+=======
+import alluxio.underfs.MasterUfsClientFecther;
+>>>>>>> f164aa9e7d... WIP
 import alluxio.underfs.UfsManager;
 import alluxio.underfs.UnderFileSystemConfiguration;
 import alluxio.util.CommonUtils;
@@ -50,9 +56,17 @@ public class AsyncUfsAbsentPathCacheTest {
   @Before
   public void before() throws Exception {
     mLocalUfsPath = Files.createTempDir().getAbsolutePath();
+<<<<<<< HEAD
     mUfsManager = new MasterUfsManager();
     mMountTable = new MountTable(mUfsManager,
         new MountInfo(new AlluxioURI("/"), new AlluxioURI("/ufs"), 1, MountOptions.defaults()));
+||||||| parent of f164aa9e7d... WIP
+    mUfsManager = new MasterUfsManager();
+    mMountTable = new MountTable(mUfsManager);
+=======
+    mUfsManager = new MasterUfsClientFecther();
+    mMountTable = new MountTable(mUfsManager);
+>>>>>>> f164aa9e7d... WIP
     mUfsAbsentPathCache = new AsyncUfsAbsentPathCache(mMountTable, THREADS);
 
     mMountId = IdUtils.getRandomNonNegativeLong();
