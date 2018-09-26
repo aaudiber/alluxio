@@ -17,7 +17,7 @@ import alluxio.master.LocalAlluxioCluster;
 import alluxio.retry.CountingRetry;
 import alluxio.testutils.BaseIntegrationTest;
 import alluxio.testutils.LocalAlluxioClusterResource;
-import alluxio.util.network.NetworkAddressUtils;
+import alluxio.wire.WorkerNetAddress;
 import alluxio.worker.WorkerHealthCheckClient;
 
 import org.junit.Assert;
@@ -25,14 +25,15 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 
+import java.net.InetSocketAddress;
+
 public class WorkerHealthCheckClientIntegrationTest extends BaseIntegrationTest {
 
   @Rule
   public LocalAlluxioClusterResource mLocalAlluxioClusterResource =
           new LocalAlluxioClusterResource.Builder()
-                  .setProperty(PropertyKey.USER_RPC_RETRY_MAX_NUM_RETRY, 30)
-                  .setProperty(PropertyKey.WORKER_RPC_PORT, 29998)
-                  .build();
+              .setProperty(PropertyKey.USER_RPC_RETRY_MAX_NUM_RETRY, 30)
+              .build();
 
   private LocalAlluxioCluster mLocalAlluxioCluster = null;
   private HealthCheckClient mHealthCheckClient;
@@ -40,9 +41,9 @@ public class WorkerHealthCheckClientIntegrationTest extends BaseIntegrationTest 
   @Before
   public final void before() throws Exception {
     mLocalAlluxioCluster = mLocalAlluxioClusterResource.get();
+    WorkerNetAddress addr = mLocalAlluxioCluster.getWorkerAddress();
     mHealthCheckClient = new WorkerHealthCheckClient(
-        NetworkAddressUtils.getConnectAddress(NetworkAddressUtils.ServiceType.WORKER_RPC),
-        () -> new CountingRetry(1));
+        new InetSocketAddress(addr.getHost(), addr.getRpcPort()), () -> new CountingRetry(1));
   }
 
   @Test
