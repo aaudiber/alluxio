@@ -18,6 +18,7 @@ import alluxio.PropertyKey;
 import alluxio.RuntimeConstants;
 import alluxio.master.journal.JournalSystem;
 import alluxio.master.journal.JournalUtils;
+import alluxio.master.metastore.java.HeapMetastore;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,8 +56,8 @@ public final class AlluxioSecondaryMaster implements Process {
       mStartTimeMs = System.currentTimeMillis();
       mPort = Configuration.getInt(PropertyKey.MASTER_RPC_PORT);
       // Create masters.
-      MasterUtils.createMasters(mRegistry,
-          new MasterContext(mJournalSystem, mSafeModeManager, mBackupManager, mStartTimeMs, mPort));
+      MasterUtils.createMasters(mRegistry, new MasterContext(mJournalSystem, mSafeModeManager,
+          mBackupManager, new HeapMetastore(), mStartTimeMs, mPort));
       // Check that journals of each service have been formatted.
       if (!mJournalSystem.isFormatted()) {
         throw new RuntimeException(
