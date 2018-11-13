@@ -1488,6 +1488,13 @@ public final class PropertyKey implements Comparable<PropertyKey> {
           .setConsistencyCheckLevel(ConsistencyCheckLevel.WARN)
           .setScope(Scope.MASTER)
           .build();
+  public static final PropertyKey MASTER_METASTORE =
+      new Builder(Name.MASTER_METASTORE)
+          .setDefaultValue("HEAP")
+          .setDescription("The type of metastore to use, either HEAP or ROCKS")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.ENFORCE)
+          .setScope(Scope.MASTER)
+          .build();
 
   //
   // Worker related properties
@@ -3484,6 +3491,7 @@ public final class PropertyKey implements Comparable<PropertyKey> {
     public static final String MASTER_WORKER_THREADS_MAX = "alluxio.master.worker.threads.max";
     public static final String MASTER_WORKER_THREADS_MIN = "alluxio.master.worker.threads.min";
     public static final String MASTER_WORKER_TIMEOUT_MS = "alluxio.master.worker.timeout";
+    public static final String MASTER_METASTORE = "alluxio.master.metastore";
     public static final String MASTER_JOURNAL_CHECKPOINT_PERIOD_ENTRIES =
         "alluxio.master.journal.checkpoint.period.entries";
     public static final String MASTER_JOURNAL_GC_PERIOD_MS = "alluxio.master.journal.gc.period";

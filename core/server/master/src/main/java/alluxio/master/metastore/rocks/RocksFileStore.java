@@ -9,27 +9,12 @@
  * See the NOTICE file distributed with this work for information regarding copyright ownership.
  */
 
-package alluxio.master.metastore;
+package alluxio.master.metastore.rocks;
+
+import alluxio.master.metastore.FileStore;
 
 /**
- * A store for managing Alluxio metadata.
+ * File store backed by RocksDB.
  */
-public interface Metastore {
-  /**
-   * @return the file store
-   */
-  FileStore getFileStore();
-
-  /**
-   * @return the block store
-   */
-  BlockStore getBlockStore();
-
-  /**
-   * Metastore types.
-   */
-  enum Type {
-    HEAP,
-    ROCKS
-  }
+public class RocksFileStore implements FileStore {
 }

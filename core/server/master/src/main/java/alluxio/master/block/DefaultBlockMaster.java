@@ -33,7 +33,6 @@ import alluxio.heartbeat.HeartbeatExecutor;
 import alluxio.heartbeat.HeartbeatThread;
 import alluxio.master.AbstractMaster;
 import alluxio.master.MasterContext;
-import alluxio.master.block.meta.MasterBlockInfo;
 import alluxio.master.block.meta.MasterWorkerInfo;
 import alluxio.master.journal.JournalContext;
 import alluxio.master.metastore.BlockStore;
@@ -140,18 +139,19 @@ public final class DefaultBlockMaster extends AbstractMaster implements BlockMas
    *
    * The block master uses concurrent data structures to allow non-conflicting concurrent access.
    * This means each piece of metadata should be locked individually. There are two types of
-   * metadata in the {@link DefaultBlockMaster}; {@link MasterBlockInfo} and
-   * {@link MasterWorkerInfo}.
-   * Individual objects must be locked before modifying the object, or reading a modifiable field
-   * of an object. This will protect the internal integrity of the metadata object.
+   * metadata in the {@link DefaultBlockMaster}; block metadata and worker metadata.
    *
-   * Lock ordering must be preserved in order to prevent deadlock. If both a worker and block
-   * metadata must be locked at the same time, the worker metadata ({@link MasterWorkerInfo})
-   * must be locked before the block metadata ({@link MasterBlockInfo}).
+   * To modify or read a modifiable piece of worker metadata, the {@link MasterWorkerInfo} for the
+   * worker must be locked. For block metadata, the id of the block must be locked. This will
+   * protect the internal integrity of the block and worker metadata.
+   *
+   * Lock ordering must be preserved in order to prevent deadlock. If both worker and block
+   * metadata must be locked at the same time, the worker metadata must be locked before the block
+   * metadata
    *
    * It should not be the case that multiple worker metadata must be locked at the same time, or
-   * multiple block metadata must be locked at the same time. Operations involving different
-   * workers or different blocks should be able to be performed independently.
+   * multiple block metadata must be locked at the same time. Operations involving different workers
+   * or different blocks should be able to be performed independently.
    */
 
   // Block metadata management.

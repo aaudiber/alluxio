@@ -16,7 +16,10 @@ import alluxio.Configuration;
 import alluxio.PropertyKey;
 import alluxio.RuntimeConstants;
 import alluxio.master.journal.JournalSystem;
+import alluxio.master.metastore.Metastore;
+import alluxio.master.metastore.Metastore.Type;
 import alluxio.master.metastore.java.HeapMetastore;
+import alluxio.master.metastore.rocks.RocksMetastore;
 import alluxio.metrics.MetricsSystem;
 import alluxio.metrics.sink.MetricsServlet;
 import alluxio.metrics.sink.PrometheusMetricsServlet;
@@ -167,8 +170,11 @@ public class AlluxioMasterProcess implements MasterProcess {
       mRegistry = new MasterRegistry();
       mSafeModeManager = new DefaultSafeModeManager();
       mBackupManager = new BackupManager(mRegistry);
+      Metastore metastore =
+          Configuration.getEnum(PropertyKey.MASTER_METASTORE, Type.class) == Type.HEAP
+              ? new HeapMetastore() : new RocksMetastore();
       MasterContext context = new MasterContext(mJournalSystem, mSafeModeManager, mBackupManager,
-          new HeapMetastore(), mStartTimeMs, mPort);
+          metastore, mStartTimeMs, mPort);
       mPauseStateLock = context.pauseStateLock();
       MasterUtils.createMasters(mRegistry, context);
     } catch (Exception e) {
