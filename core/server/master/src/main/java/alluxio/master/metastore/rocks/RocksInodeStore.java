@@ -22,14 +22,18 @@ import alluxio.proto.meta.InodeMeta;
 import alluxio.util.io.FileUtils;
 
 import com.google.common.primitives.Longs;
+import org.rocksdb.BlockBasedTableConfig;
+import org.rocksdb.BloomFilter;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.DBOptions;
+import org.rocksdb.PlainTableConfig;
 import org.rocksdb.ReadOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.RocksIterator;
+import org.rocksdb.TableFormatConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -214,7 +218,21 @@ public class RocksInodeStore implements InodeStore {
 
     new File(mBaseDir).mkdirs();
 
+
+    TableFormatConfig tableFormatConfig;
+    if (Configuration.get(PropertyKey.MASTER_METASTORE_ROCKS_TABLE_FACTORY).equals("BLOCK")) {
+      tableFormatConfig = new BlockBasedTableConfig()
+          .setFilter(new BloomFilter())
+          .setBlockSize(Configuration.getBytes(PropertyKey.MASTER_METASTORE_ROCKS_BLOCK_SIZE))
+          .setBlockCacheSize(
+              Configuration.getBytes(PropertyKey.MASTER_METASTORE_ROCKS_BLOCK_CACHE_SIZE));
+    } else {
+      tableFormatConfig = new PlainTableConfig();
+    }
+
     ColumnFamilyOptions cfOpts = new ColumnFamilyOptions()
+        .setBloomLocality(Configuration.getInt(PropertyKey.MASTER_METASTORE_ROCKS_BLOOM_LOCALITY))
+        .setTableFormatConfig(tableFormatConfig)
         .useFixedLengthPrefixExtractor(Longs.BYTES); // We always search using the initial long key
 
     List<ColumnFamilyDescriptor> cfDescriptors = Arrays.asList(
@@ -225,8 +243,14 @@ public class RocksInodeStore implements InodeStore {
     );
 
     DBOptions options = new DBOptions()
+        .setMaxOpenFiles(-1)
         .setCreateIfMissing(true)
         .setCreateMissingColumnFamilies(true);
+
+    if (Configuration.getBoolean(PropertyKey.MASTER_METASTORE_ROCKS_IN_MEMORY)) {
+      options.setAllowMmapReads(true);
+      options.setAllowMmapWrites(true);
+    }
 
     // a list which will hold the handles for the column families once the db is opened
     List<ColumnFamilyHandle> columns = new ArrayList<>();

@@ -1151,6 +1151,41 @@ public final class PropertyKey implements Comparable<PropertyKey> {
           .setConsistencyCheckLevel(ConsistencyCheckLevel.ENFORCE)
           .setScope(Scope.MASTER)
           .build();
+  public static final PropertyKey MASTER_METASTORE_ROCKS_TABLE_FACTORY =
+      new Builder(Name.MASTER_METASTORE_ROCKS_TABLE_FACTORY)
+          .setDefaultValue("BLOCK")
+          .setDescription("The RocksDB table factory to use, either BLOCK or PLAIN.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.ENFORCE)
+          .setScope(Scope.MASTER)
+          .build();
+  public static final PropertyKey MASTER_METASTORE_ROCKS_BLOOM_LOCALITY =
+      new Builder(Name.MASTER_METASTORE_ROCKS_BLOOM_LOCALITY)
+          .setDefaultValue("0")
+          .setDescription("Bloom locality for RocksDB.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.ENFORCE)
+          .setScope(Scope.MASTER)
+          .build();
+  public static final PropertyKey MASTER_METASTORE_ROCKS_IN_MEMORY =
+      new Builder(Name.MASTER_METASTORE_ROCKS_IN_MEMORY)
+          .setDefaultValue("true")
+          .setDescription("Whether the RocksDB metastore is in-memory.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.ENFORCE)
+          .setScope(Scope.MASTER)
+          .build();
+  public static final PropertyKey MASTER_METASTORE_ROCKS_BLOCK_SIZE =
+      new Builder(Name.MASTER_METASTORE_ROCKS_BLOCK_SIZE)
+          .setDefaultValue("1KB")
+          .setDescription("The RocksDB block size.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.ENFORCE)
+          .setScope(Scope.MASTER)
+          .build();
+  public static final PropertyKey MASTER_METASTORE_ROCKS_BLOCK_CACHE_SIZE =
+      new Builder(Name.MASTER_METASTORE_ROCKS_BLOCK_CACHE_SIZE)
+          .setDefaultValue("8MB")
+          .setDescription("The size to use for the RocksDB block cache.")
+          .setConsistencyCheckLevel(ConsistencyCheckLevel.ENFORCE)
+          .setScope(Scope.MASTER)
+          .build();
   public static final PropertyKey MASTER_METASTORE_DIR =
       new Builder(Name.MASTER_METASTORE_DIR)
           .setDefaultValue(String.format("${%s}/metastore", Name.WORK_DIR))
@@ -3556,6 +3591,16 @@ public final class PropertyKey implements Comparable<PropertyKey> {
         "alluxio.master.journal.tailer.sleep.time";
     public static final String MASTER_KEYTAB_KEY_FILE = "alluxio.master.keytab.file";
     public static final String MASTER_METASTORE = "alluxio.master.metastore";
+    public static final String MASTER_METASTORE_ROCKS_BLOOM_LOCALITY =
+        "alluxio.master.metastore.rocks.bloom.locality";
+    public static final String MASTER_METASTORE_ROCKS_IN_MEMORY =
+        "alluxio.master.metastore.rocks.in.memory";
+    public static final String MASTER_METASTORE_ROCKS_TABLE_FACTORY =
+        "alluxio.master.metastore.rocks.table.factory";
+    public static final String MASTER_METASTORE_ROCKS_BLOCK_SIZE =
+        "alluxio.master.metastore.rocks.block.size";
+    public static final String MASTER_METASTORE_ROCKS_BLOCK_CACHE_SIZE =
+        "alluxio.master.metastore.rocks.block.cache.size";
     public static final String MASTER_METASTORE_DIR = "alluxio.master.metastore.dir";
     public static final String MASTER_PERSISTENCE_CHECKER_INTERVAL_MS =
         "alluxio.master.persistence.checker.interval.ms";
