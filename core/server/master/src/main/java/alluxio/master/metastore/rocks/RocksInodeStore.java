@@ -34,6 +34,7 @@ import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.RocksIterator;
 import org.rocksdb.TableFormatConfig;
+import org.rocksdb.WriteOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,6 +56,10 @@ public class RocksInodeStore implements InodeStore {
   private static final String LAST_MODIFIED_COLUMN = "last-modified";
   private static final String EDGES_COLUMN = "edges";
 
+  private final WriteOptions mDisableWAL;
+  private final ReadOptions mReadPrefixSameAsStart;
+  private final ReadOptions mReadSkipCheckSums;
+
   private final String mBaseDir;
 
   private String mDbPath;
@@ -69,6 +74,9 @@ public class RocksInodeStore implements InodeStore {
   public RocksInodeStore() throws RocksDBException {
     mBaseDir = Configuration.get(PropertyKey.MASTER_METASTORE_DIR);
     RocksDB.loadLibrary();
+    mDisableWAL = new WriteOptions().setDisableWAL(true);
+    mReadPrefixSameAsStart = new ReadOptions().setPrefixSameAsStart(true);
+    mReadSkipCheckSums = new ReadOptions().setVerifyChecksums(false);
     initDb();
   }
 
@@ -76,7 +84,7 @@ public class RocksInodeStore implements InodeStore {
   public void remove(InodeView inode) {
     try {
       byte[] id = Longs.toByteArray(inode.getId());
-      mDb.delete(mInodesColumn, id);
+      mDb.delete(mInodesColumn, mDisableWAL, id);
       removeChild(inode.getParentId(), inode.getName());
     } catch (RocksDBException e) {
       throw new RuntimeException(e);
@@ -86,7 +94,8 @@ public class RocksInodeStore implements InodeStore {
   @Override
   public void writeInode(MutableInode<?> inode) {
     try {
-      mDb.put(mInodesColumn, Longs.toByteArray(inode.getId()), inode.toProto().toByteArray());
+      mDb.put(mInodesColumn, mDisableWAL, Longs.toByteArray(inode.getId()),
+          inode.toProto().toByteArray());
     } catch (RocksDBException e) {
       throw new RuntimeException(e);
     }
@@ -104,7 +113,7 @@ public class RocksInodeStore implements InodeStore {
   @Override
   public void addChild(long parentId, InodeView inode) {
     try {
-      mDb.put(mEdgesColumn, RocksUtils.toByteArray(parentId, inode.getName()),
+      mDb.put(mEdgesColumn, mDisableWAL, RocksUtils.toByteArray(parentId, inode.getName()),
           Longs.toByteArray(inode.getId()));
     } catch (RocksDBException e) {
       throw new RuntimeException(e);
@@ -114,7 +123,7 @@ public class RocksInodeStore implements InodeStore {
   @Override
   public void removeChild(long parentId, String name) {
     try {
-      mDb.delete(mEdgesColumn, RocksUtils.toByteArray(parentId, name));
+      mDb.delete(mEdgesColumn, mDisableWAL, RocksUtils.toByteArray(parentId, name));
     } catch (RocksDBException e) {
       throw new RuntimeException(e);
     }
@@ -133,7 +142,7 @@ public class RocksInodeStore implements InodeStore {
   public Optional<MutableInode<?>> getMutable(long id) {
     byte[] inode;
     try {
-      inode = mDb.get(mInodesColumn, Longs.toByteArray(id));
+      inode = mDb.get(mInodesColumn, mReadSkipCheckSums, Longs.toByteArray(id));
     } catch (RocksDBException e) {
       throw new RuntimeException(e);
     }
@@ -149,8 +158,7 @@ public class RocksInodeStore implements InodeStore {
 
   @Override
   public Iterable<? extends Inode> getChildren(InodeDirectoryView inode) {
-    RocksIterator iter =
-        mDb.newIterator(mEdgesColumn, new ReadOptions().setPrefixSameAsStart(true));
+    RocksIterator iter = mDb.newIterator(mEdgesColumn, mReadPrefixSameAsStart);
     iter.seek(Longs.toByteArray(inode.getId()));
     return () -> new Iterator<Inode>() {
       @Override
@@ -175,7 +183,7 @@ public class RocksInodeStore implements InodeStore {
   public Optional<Inode> getChild(InodeDirectoryView inode, String name) {
     byte[] id;
     try {
-      id = mDb.get(mEdgesColumn, RocksUtils.toByteArray(inode.getId(), name));
+      id = mDb.get(mEdgesColumn, mReadSkipCheckSums, RocksUtils.toByteArray(inode.getId(), name));
     } catch (RocksDBException e) {
       throw new RuntimeException(e);
     }
@@ -192,8 +200,7 @@ public class RocksInodeStore implements InodeStore {
 
   @Override
   public boolean hasChildren(InodeDirectoryView inode) {
-    RocksIterator iter =
-        mDb.newIterator(mEdgesColumn, new ReadOptions().setPrefixSameAsStart(true));
+    RocksIterator iter = mDb.newIterator(mEdgesColumn, mReadPrefixSameAsStart);
     iter.seek(Longs.toByteArray(inode.getId()));
     return iter.isValid();
   }
@@ -217,7 +224,6 @@ public class RocksInodeStore implements InodeStore {
     }
 
     new File(mBaseDir).mkdirs();
-
 
     TableFormatConfig tableFormatConfig;
     if (Configuration.get(PropertyKey.MASTER_METASTORE_ROCKS_TABLE_FACTORY).equals("BLOCK")) {
