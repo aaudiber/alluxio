@@ -13,14 +13,9 @@
 
 FROM maven:3.5.4-jdk-8
 
-# Add jenkins user to make it easier to use this image from jenkins contexts
-RUN adduser --quiet jenkins
-RUN usermod -u 1000 jenkins && groupmod -g 1000 jenkins
-
-RUN apt-get update -y && \
+# Give everyone access to the jenkins work directory. This lets us run the image as any user.
+RUN mkdir -p /home/jenkins && \
+    chmod -R 777 /home/jenkins && \
+    apt-get update -y && \
     apt-get install -y golang-go ruby ruby-dev make build-essential fuse && \
     gem install jekyll bundler
-
-# Give jenkins user access to /root/.m2. We can still run the image as root for local debugging
-RUN mkdir -p /root/.m2 && \
-    chown -R jenkins:jenkins /root/.m2

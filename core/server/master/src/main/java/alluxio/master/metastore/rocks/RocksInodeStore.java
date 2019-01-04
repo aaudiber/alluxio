@@ -27,6 +27,7 @@ import org.rocksdb.BloomFilter;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.ColumnFamilyOptions;
+import org.rocksdb.CompressionType;
 import org.rocksdb.DBOptions;
 import org.rocksdb.HashLinkedListMemTableConfig;
 import org.rocksdb.PlainTableConfig;
@@ -54,7 +55,6 @@ public class RocksInodeStore implements InodeStore {
   private static final Logger LOG = LoggerFactory.getLogger(RocksBlockStore.class);
   private static final String INODES_DB_NAME = "inodes";
   private static final String INODES_COLUMN = "inodes";
-  private static final String LAST_MODIFIED_COLUMN = "last-modified";
   private static final String EDGES_COLUMN = "edges";
 
   private final WriteOptions mDisableWAL;
@@ -141,20 +141,43 @@ public class RocksInodeStore implements InodeStore {
 
   @Override
   public Optional<MutableInode<?>> getMutable(long id) {
-    byte[] inode;
+    byte[] inodeBytes;
     try {
-      inode = mDb.get(mInodesColumn, mReadSkipCheckSums, Longs.toByteArray(id));
+      inodeBytes = mDb.get(mInodesColumn, mReadSkipCheckSums, Longs.toByteArray(id));
     } catch (RocksDBException e) {
       throw new RuntimeException(e);
     }
-    if (inode == null) {
+    if (inodeBytes == null) {
       return Optional.empty();
     }
     try {
-      return Optional.of(MutableInode.fromProto(InodeMeta.Inode.parseFrom(inode)));
+      return Optional.of(MutableInode.fromProto(InodeMeta.Inode.parseFrom(inodeBytes)));
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
+  }
+
+  @Override
+  public Iterable<Long> getChildIds(InodeDirectoryView inode) {
+    RocksIterator iter = mDb.newIterator(mEdgesColumn, mReadPrefixSameAsStart);
+    iter.seek(Longs.toByteArray(inode.getId()));
+    return () -> new Iterator<Long>() {
+      @Override
+      public boolean hasNext() {
+        return iter.isValid();
+      }
+
+      @Override
+      public Long next() {
+        try {
+          return Longs.fromByteArray(iter.value());
+        } catch (Exception e) {
+          throw new RuntimeException(e);
+        } finally {
+          iter.next();
+        }
+      }
+    };
   }
 
   @Override
@@ -165,7 +188,7 @@ public class RocksInodeStore implements InodeStore {
       @Override
       public boolean hasNext() {
         return iter.isValid();
-      }
+       }
 
       @Override
       public Inode next() {
@@ -181,7 +204,7 @@ public class RocksInodeStore implements InodeStore {
   }
 
   @Override
-  public Optional<Inode> getChild(InodeDirectoryView inode, String name) {
+  public Optional<Long> getChildId(InodeDirectoryView inode, String name) {
     byte[] id;
     try {
       id = mDb.get(mEdgesColumn, mReadSkipCheckSums, RocksUtils.toByteArray(inode.getId(), name));
@@ -191,12 +214,19 @@ public class RocksInodeStore implements InodeStore {
     if (id == null) {
       return Optional.empty();
     }
-    Optional<Inode> child = get(Longs.fromByteArray(id));
-    if (!child.isPresent()) {
-      LOG.warn("Found child edge {}->{}={}, but inode {} does not exist", inode.getId(), name,
-          Longs.fromByteArray(id), Longs.fromByteArray(id));
-    }
-    return child;
+    return Optional.of(Longs.fromByteArray(id));
+  }
+
+  @Override
+  public Optional<Inode> getChild(InodeDirectoryView inode, String name) {
+    return getChildId(inode, name).flatMap(id -> {
+      Optional<Inode> child = get(id);
+      if (!child.isPresent()) {
+        LOG.warn("Found child edge {}->{}={}, but inode {} does not exist", inode.getId(), name,
+            id, id);
+      }
+      return child;
+    });
   }
 
   @Override
@@ -241,12 +271,12 @@ public class RocksInodeStore implements InodeStore {
         .setBloomLocality(Configuration.getInt(PropertyKey.MASTER_METASTORE_ROCKS_BLOOM_LOCALITY))
         .setMemTableConfig(new HashLinkedListMemTableConfig())
         .setTableFormatConfig(tableFormatConfig)
+        .setCompressionType(CompressionType.NO_COMPRESSION)
         .useFixedLengthPrefixExtractor(Longs.BYTES); // We always search using the initial long key
 
     List<ColumnFamilyDescriptor> cfDescriptors = Arrays.asList(
         new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfOpts),
         new ColumnFamilyDescriptor(INODES_COLUMN.getBytes(), cfOpts),
-        new ColumnFamilyDescriptor(LAST_MODIFIED_COLUMN.getBytes(), cfOpts),
         new ColumnFamilyDescriptor(EDGES_COLUMN.getBytes(), cfOpts)
     );
 
