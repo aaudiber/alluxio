@@ -28,6 +28,7 @@ import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.DBOptions;
+import org.rocksdb.HashLinkedListMemTableConfig;
 import org.rocksdb.PlainTableConfig;
 import org.rocksdb.ReadOptions;
 import org.rocksdb.RocksDB;
@@ -238,6 +239,7 @@ public class RocksInodeStore implements InodeStore {
 
     ColumnFamilyOptions cfOpts = new ColumnFamilyOptions()
         .setBloomLocality(Configuration.getInt(PropertyKey.MASTER_METASTORE_ROCKS_BLOOM_LOCALITY))
+        .setMemTableConfig(new HashLinkedListMemTableConfig())
         .setTableFormatConfig(tableFormatConfig)
         .useFixedLengthPrefixExtractor(Longs.BYTES); // We always search using the initial long key
 
@@ -249,6 +251,7 @@ public class RocksInodeStore implements InodeStore {
     );
 
     DBOptions options = new DBOptions()
+        .setAllowConcurrentMemtableWrite(false)
         .setMaxOpenFiles(-1)
         .setCreateIfMissing(true)
         .setCreateMissingColumnFamilies(true);
