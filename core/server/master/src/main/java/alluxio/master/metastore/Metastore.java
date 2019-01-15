@@ -11,6 +11,10 @@
 
 package alluxio.master.metastore;
 
+import alluxio.master.file.meta.InodeLockManager;
+
+import java.util.function.Function;
+
 /**
  * A store for managing Alluxio metadata.
  */
@@ -32,4 +36,6 @@ public interface Metastore {
     HEAP,
     ROCKS
   }
+
+  interface Factory extends Function<InodeLockManager, Metastore> {}
 }

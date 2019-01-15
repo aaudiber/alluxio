@@ -46,11 +46,20 @@ public interface InodeStore extends ReadOnlyInodeStore {
   }
 
   /**
-   * Removes an inode from the inode store. The edge leading to it will also be removed.
+   * Removes an inode from the inode store. This does *not* remove the edge leading to the inode.
+   *
+   * @param inodeId an inode to remove
+   */
+  void remove(Long inodeId);
+
+  /**
+   * Removes an inode from the inode store. This does *not* remove the edge leading to the inode.
    *
    * @param inode an inode to remove
    */
-  void remove(InodeView inode);
+  default void remove(InodeView inode) {
+    remove(inode.getId());
+  }
 
   /**
    * Adds the given inode, or overwrites it if it exists.
@@ -69,9 +78,20 @@ public interface InodeStore extends ReadOnlyInodeStore {
    * inode store.
    *
    * @param parentId the parent id
-   * @param inode the child inode
+   * @param childId the child inode id
    */
-  void addChild(long parentId, InodeView inode);
+  void addChild(long parentId, String childName, Long childId);
+
+  /**
+   * Makes an inode the child of the specified parent. The added child must already exist in the
+   * inode store.
+   *
+   * @param parentId the parent id
+   * @param child the child inode
+   */
+  default void addChild(long parentId, InodeView child) {
+    addChild(parentId, child.getName(), child.getId());
+  }
 
   /**
    * Removes a child from a parent inode.

@@ -83,11 +83,10 @@ public class RocksInodeStore implements InodeStore {
   }
 
   @Override
-  public void remove(InodeView inode) {
+  public void remove(Long inodeId) {
     try {
-      byte[] id = Longs.toByteArray(inode.getId());
+      byte[] id = Longs.toByteArray(inodeId);
       mDb.delete(mInodesColumn, mDisableWAL, id);
-      removeChild(inode.getParentId(), inode.getName());
     } catch (RocksDBException e) {
       throw new RuntimeException(e);
     }
@@ -113,10 +112,10 @@ public class RocksInodeStore implements InodeStore {
   }
 
   @Override
-  public void addChild(long parentId, InodeView inode) {
+  public void addChild(long parentId, String childName, Long childId) {
     try {
-      mDb.put(mEdgesColumn, mDisableWAL, RocksUtils.toByteArray(parentId, inode.getName()),
-          Longs.toByteArray(inode.getId()));
+      mDb.put(mEdgesColumn, mDisableWAL, RocksUtils.toByteArray(parentId, childName),
+          Longs.toByteArray(childId));
     } catch (RocksDBException e) {
       throw new RuntimeException(e);
     }
@@ -159,9 +158,9 @@ public class RocksInodeStore implements InodeStore {
   }
 
   @Override
-  public Iterable<Long> getChildIds(InodeDirectoryView inode) {
+  public Iterable<Long> getChildIds(Long inodeId) {
     RocksIterator iter = mDb.newIterator(mEdgesColumn, mReadPrefixSameAsStart);
-    iter.seek(Longs.toByteArray(inode.getId()));
+    iter.seek(Longs.toByteArray(inodeId));
     return () -> new Iterator<Long>() {
       @Override
       public boolean hasNext() {
@@ -182,9 +181,9 @@ public class RocksInodeStore implements InodeStore {
   }
 
   @Override
-  public Iterable<? extends Inode> getChildren(InodeDirectoryView inode) {
+  public Iterable<? extends Inode> getChildren(Long inodeId) {
     RocksIterator iter = mDb.newIterator(mEdgesColumn, mReadPrefixSameAsStart);
-    iter.seek(Longs.toByteArray(inode.getId()));
+    iter.seek(Longs.toByteArray(inodeId));
     return () -> new Iterator<Inode>() {
       @Override
       public boolean hasNext() {
@@ -205,10 +204,10 @@ public class RocksInodeStore implements InodeStore {
   }
 
   @Override
-  public Optional<Long> getChildId(InodeDirectoryView inode, String name) {
+  public Optional<Long> getChildId(Long inodeId, String name) {
     byte[] id;
     try {
-      id = mDb.get(mEdgesColumn, RocksUtils.toByteArray(inode.getId(), name));
+      id = mDb.get(mEdgesColumn, RocksUtils.toByteArray(inodeId, name));
     } catch (RocksDBException e) {
       throw new RuntimeException(e);
     }
@@ -219,11 +218,11 @@ public class RocksInodeStore implements InodeStore {
   }
 
   @Override
-  public Optional<Inode> getChild(InodeDirectoryView inode, String name) {
-    return getChildId(inode, name).flatMap(id -> {
+  public Optional<Inode> getChild(Long inodeId, String name) {
+    return getChildId(inodeId, name).flatMap(id -> {
       Optional<Inode> child = get(id);
       if (!child.isPresent()) {
-        LOG.warn("Found child edge {}->{}={}, but inode {} does not exist", inode.getId(), name,
+        LOG.warn("Found child edge {}->{}={}, but inode {} does not exist", inodeId, name,
             id, id);
       }
       return child;

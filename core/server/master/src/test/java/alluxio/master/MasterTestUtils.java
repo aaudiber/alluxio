@@ -13,9 +13,12 @@ package alluxio.master;
 
 import static org.mockito.Mockito.mock;
 
+import alluxio.Configuration;
+import alluxio.master.file.meta.InodeLockManager;
 import alluxio.master.journal.JournalSystem;
 import alluxio.master.journal.noop.NoopJournalSystem;
 import alluxio.master.metastore.java.HeapMetastore;
+import alluxio.master.metastore.rocks.RocksMetastore;
 
 /**
  * Util methods to help with master testing.
@@ -38,7 +41,8 @@ public final class MasterTestUtils {
         .setJournalSystem(journalSystem)
         .setSafeModeManager(new TestSafeModeManager())
         .setBackupManager(mock(BackupManager.class))
-        .setMetastore(new HeapMetastore())
+        .setMetastoreFactory(
+            inodeLockManager -> new RocksMetastore(inodeLockManager, Configuration.global()))
         .setStartTimeMs(-1)
         .setPort(-1)
         .build();

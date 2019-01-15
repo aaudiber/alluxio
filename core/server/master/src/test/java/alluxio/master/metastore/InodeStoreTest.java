@@ -19,10 +19,12 @@ import alluxio.AlluxioTestDirectory;
 import alluxio.PropertyKey;
 import alluxio.conf.InstancedConfiguration;
 import alluxio.master.file.meta.Inode;
+import alluxio.master.file.meta.InodeLockManager;
 import alluxio.master.file.meta.MutableInodeDirectory;
 import alluxio.master.file.meta.MutableInodeFile;
 import alluxio.master.file.options.CreateDirectoryOptions;
 import alluxio.master.file.options.CreateFileOptions;
+import alluxio.master.metastore.caching.CachingInodeStore;
 import alluxio.master.metastore.java.HeapInodeStore;
 import alluxio.master.metastore.rocks.RocksInodeStore;
 
@@ -44,10 +46,10 @@ public class InodeStoreTest {
     InstancedConfiguration conf = InstancedConfiguration.newBuilder()
         .setProperty(PropertyKey.MASTER_METASTORE_DIR,
             AlluxioTestDirectory.createTemporaryDirectory("inode-store-test"))
-        .setProperty(PropertyKey.MASTER_METASTORE_INODE_CACHE_SIZE, 3)
+        .setProperty(PropertyKey.MASTER_METASTORE_INODE_CACHE_MAX_SIZE, 3)
         .build();
     return Arrays.asList(new HeapInodeStore(), new RocksInodeStore(conf),
-        new CachingInodeStore(new RocksInodeStore(conf), conf));
+        new CachingInodeStore(new RocksInodeStore(conf), new InodeLockManager(), conf));
   }
 
   private static final MutableInodeDirectory ROOT = inodeDir(0, -1, "");
@@ -127,7 +129,9 @@ public class InodeStoreTest {
     }
     for (Long i : fileIds) {
       assertTrue(mStore.get(i).isPresent());
-      mStore.remove(mStore.get(i).get());
+      Inode inode = mStore.get(i).get();
+      mStore.remove(inode);
+      mStore.removeChild(inode.getParentId(), inode.getName());
       assertFalse(mStore.get(i).isPresent());
     }
 

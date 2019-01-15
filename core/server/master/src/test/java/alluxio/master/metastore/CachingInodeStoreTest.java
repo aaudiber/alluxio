@@ -15,16 +15,19 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyLong;
+import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
 import alluxio.PropertyKey;
 import alluxio.conf.InstancedConfiguration;
 import alluxio.master.file.meta.Inode;
+import alluxio.master.file.meta.InodeLockManager;
 import alluxio.master.file.meta.MutableInodeDirectory;
 import alluxio.master.file.meta.MutableInodeFile;
 import alluxio.master.file.options.CreateDirectoryOptions;
 import alluxio.master.file.options.CreateFileOptions;
+import alluxio.master.metastore.caching.CachingInodeStore;
 import alluxio.master.metastore.java.HeapInodeStore;
 
 import com.google.common.collect.Iterables;
@@ -49,8 +52,9 @@ public class CachingInodeStoreTest {
   @Before
   public void before() {
     mBackingStore = spy(new HeapInodeStore());
-    mStore = new CachingInodeStore(mBackingStore, InstancedConfiguration.newBuilder()
-        .setProperty(PropertyKey.MASTER_METASTORE_INODE_CACHE_SIZE, CACHE_SIZE).build());
+    mStore = new CachingInodeStore(mBackingStore, new InodeLockManager(),
+        InstancedConfiguration.newBuilder()
+            .setProperty(PropertyKey.MASTER_METASTORE_INODE_CACHE_MAX_SIZE, CACHE_SIZE).build());
     mStore.writeInode(TEST_INODE_DIR);
   }
 
@@ -132,8 +136,8 @@ public class CachingInodeStoreTest {
   }
 
   private void verifyNoBackingStoreReads() {
-    verify(mBackingStore, Mockito.times(0)).getChild(any(), any());
-    verify(mBackingStore, Mockito.times(0)).getChildId(any(), any());
+    verify(mBackingStore, Mockito.times(0)).getChild(anyLong(), anyString());
+    verify(mBackingStore, Mockito.times(0)).getChildId(anyLong(), anyString());
     verify(mBackingStore, Mockito.times(0)).get(anyLong());
     verify(mBackingStore, Mockito.times(0)).getMutable(anyLong());
   }

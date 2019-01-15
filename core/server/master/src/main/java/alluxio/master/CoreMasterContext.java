@@ -11,10 +11,13 @@
 
 package alluxio.master;
 
+import alluxio.master.file.meta.InodeLockManager;
 import alluxio.master.journal.JournalSystem;
 import alluxio.master.metastore.Metastore;
 
 import com.google.common.base.Preconditions;
+
+import java.util.function.Function;
 
 /**
  * This class stores fields that are specific to core masters.
@@ -22,7 +25,7 @@ import com.google.common.base.Preconditions;
 public class CoreMasterContext extends MasterContext {
   private final SafeModeManager mSafeModeManager;
   private final BackupManager mBackupManager;
-  private final Metastore mMetastore;
+  private final Metastore.Factory mMetastoreFactory;
   private final long mStartTimeMs;
   private final int mPort;
 
@@ -31,7 +34,7 @@ public class CoreMasterContext extends MasterContext {
 
     mSafeModeManager = Preconditions.checkNotNull(builder.mSafeModeManager, "safeModeManager");
     mBackupManager = Preconditions.checkNotNull(builder.mBackupManager, "backupManager");
-    mMetastore = Preconditions.checkNotNull(builder.mMetastore, "metastore");
+    mMetastoreFactory = Preconditions.checkNotNull(builder.mMetastoreFactory, "metastoreFactory");
     mStartTimeMs = builder.mStartTimeMs;
     mPort = builder.mPort;
   }
@@ -51,10 +54,10 @@ public class CoreMasterContext extends MasterContext {
   }
 
   /**
-   * @return the metastore
+   * @return the metastore factory
    */
-  public Metastore getMetastore() {
-    return mMetastore;
+  public Metastore.Factory getMetastoreFactory() {
+    return mMetastoreFactory;
   }
 
   /**
@@ -85,7 +88,7 @@ public class CoreMasterContext extends MasterContext {
     private JournalSystem mJournalSystem;
     private SafeModeManager mSafeModeManager;
     private BackupManager mBackupManager;
-    private Metastore mMetastore;
+    private Metastore.Factory mMetastoreFactory;
     private long mStartTimeMs;
     private int mPort;
 
@@ -117,11 +120,11 @@ public class CoreMasterContext extends MasterContext {
     }
 
     /**
-     * @param metastore metastore
+     * @param metastoreFactory factory for creating a metastore
      * @return the builder
      */
-    public Builder setMetastore(Metastore metastore) {
-      mMetastore = metastore;
+    public Builder setMetastoreFactory(Metastore.Factory metastoreFactory) {
+      mMetastoreFactory = metastoreFactory;
       return this;
     }
 

@@ -40,13 +40,28 @@ public class DelegatingReadOnlyInodeStore implements ReadOnlyInodeStore {
   }
 
   @Override
+  public Iterable<Long> getChildIds(Long inodeId) {
+    return mDelegate.getChildIds(inodeId);
+  }
+
+  @Override
   public Iterable<Long> getChildIds(InodeDirectoryView inode) {
     return mDelegate.getChildIds(inode);
   }
 
   @Override
+  public Iterable<? extends Inode> getChildren(Long inodeId) {
+    return mDelegate.getChildren(inodeId);
+  }
+
+  @Override
   public Iterable<? extends Inode> getChildren(InodeDirectoryView inode) {
     return mDelegate.getChildren(inode);
+  }
+
+  @Override
+  public Optional<Long> getChildId(Long inodeId, String name) {
+    return mDelegate.getChildId(inodeId, name);
   }
 
   @Override
@@ -57,6 +72,11 @@ public class DelegatingReadOnlyInodeStore implements ReadOnlyInodeStore {
   @Override
   public Optional<Inode> getChild(InodeDirectoryView inode, String name) {
     return mDelegate.getChild(inode, name);
+  }
+
+  @Override
+  public Optional<Inode> getChild(Long inodeId, String name) {
+    return mDelegate.getChild(inodeId, name);
   }
 
   @Override

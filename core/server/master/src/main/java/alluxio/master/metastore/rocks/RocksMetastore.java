@@ -12,8 +12,9 @@
 package alluxio.master.metastore.rocks;
 
 import alluxio.conf.InstancedConfiguration;
+import alluxio.master.file.meta.InodeLockManager;
 import alluxio.master.metastore.BlockStore;
-import alluxio.master.metastore.CachingInodeStore;
+import alluxio.master.metastore.caching.CachingInodeStore;
 import alluxio.master.metastore.InodeStore;
 import alluxio.master.metastore.Metastore;
 
@@ -29,11 +30,11 @@ public class RocksMetastore implements Metastore {
   /**
    * Constructs a new RocksMetastore.
    *
-   * @param conf configuration
+   * @param lockManager inode lock manager
    */
-  public RocksMetastore(InstancedConfiguration conf) {
+  public RocksMetastore(InodeLockManager lockManager, InstancedConfiguration conf) {
     try {
-      mInodeStore = new CachingInodeStore(new RocksInodeStore(conf), conf);
+      mInodeStore = new CachingInodeStore(new RocksInodeStore(conf), lockManager, conf);
       mBlockStore = new RocksBlockStore(conf);
     } catch (RocksDBException e) {
       throw new RuntimeException(e);
