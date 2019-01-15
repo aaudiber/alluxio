@@ -46,7 +46,7 @@ public class InodeStoreTest {
     InstancedConfiguration conf = InstancedConfiguration.newBuilder()
         .setProperty(PropertyKey.MASTER_METASTORE_DIR,
             AlluxioTestDirectory.createTemporaryDirectory("inode-store-test"))
-        .setProperty(PropertyKey.MASTER_METASTORE_INODE_CACHE_MAX_SIZE, 3)
+        .setProperty(PropertyKey.MASTER_METASTORE_INODE_CACHE_MAX_SIZE, 30)
         .build();
     return Arrays.asList(new HeapInodeStore(), new RocksInodeStore(conf),
         new CachingInodeStore(new RocksInodeStore(conf), new InodeLockManager(), conf));
@@ -112,7 +112,7 @@ public class InodeStoreTest {
     MutableInodeDirectory curr = ROOT;
     List<Long> fileIds = new ArrayList<>();
     // Create 100 nested directories, each containing a file.
-    for (int i = 1; i < 10; i++) {
+    for (int i = 1; i < 100; i++) {
       MutableInodeDirectory dir = inodeDir(i, curr.getId(), "dir" + i);
       MutableInodeFile file = inodeFile(i + 100, i, "file" + i);
       fileIds.add(file.getId());
@@ -124,7 +124,7 @@ public class InodeStoreTest {
     }
 
     // Check presence and delete files.
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < 100; i++) {
       assertTrue(mStore.get(i).isPresent());
     }
     for (Long i : fileIds) {
@@ -136,16 +136,16 @@ public class InodeStoreTest {
     }
 
     // Rename a directory
-    MutableInodeDirectory dir = mStore.getMutable(5).get().asDirectory();
-    mStore.removeChild(4, "dir5");
+    MutableInodeDirectory dir = mStore.getMutable(50).get().asDirectory();
+    mStore.removeChild(49, "dir50");
     mStore.addChild(ROOT.getId(), dir);
     dir.setParentId(ROOT.getId());
     mStore.writeInode(dir);
 
     Optional<Inode> renamed = mStore.getChild(ROOT, dir.getName());
     assertTrue(renamed.isPresent());
-    assertTrue(mStore.getChild(renamed.get().asDirectory(), "dir6").isPresent());
-    assertEquals(0, Iterables.size(mStore.getChildren(mStore.get(4).get().asDirectory())));
+    assertTrue(mStore.getChild(renamed.get().asDirectory(), "dir51").isPresent());
+    assertEquals(0, Iterables.size(mStore.getChildren(mStore.get(49).get().asDirectory())));
   }
 
   private static MutableInodeDirectory inodeDir(long id, long parentId, String name) {

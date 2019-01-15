@@ -11,13 +11,11 @@
 
 package alluxio.master;
 
-import alluxio.master.file.meta.InodeLockManager;
 import alluxio.master.journal.JournalSystem;
-import alluxio.master.metastore.Metastore;
+import alluxio.master.metastore.BlockStore;
+import alluxio.master.metastore.InodeStore;
 
 import com.google.common.base.Preconditions;
-
-import java.util.function.Function;
 
 /**
  * This class stores fields that are specific to core masters.
@@ -25,7 +23,8 @@ import java.util.function.Function;
 public class CoreMasterContext extends MasterContext {
   private final SafeModeManager mSafeModeManager;
   private final BackupManager mBackupManager;
-  private final Metastore.Factory mMetastoreFactory;
+  private final BlockStore.Factory mBlockStoreFactory;
+  private final InodeStore.Factory mInodeStoreFactory;
   private final long mStartTimeMs;
   private final int mPort;
 
@@ -34,7 +33,8 @@ public class CoreMasterContext extends MasterContext {
 
     mSafeModeManager = Preconditions.checkNotNull(builder.mSafeModeManager, "safeModeManager");
     mBackupManager = Preconditions.checkNotNull(builder.mBackupManager, "backupManager");
-    mMetastoreFactory = Preconditions.checkNotNull(builder.mMetastoreFactory, "metastoreFactory");
+    mBlockStoreFactory = Preconditions.checkNotNull(builder.mBlockStoreFactory, "blockStoreFactory");
+    mInodeStoreFactory = Preconditions.checkNotNull(builder.mInodeStoreFactory, "inodeStoreFactory");
     mStartTimeMs = builder.mStartTimeMs;
     mPort = builder.mPort;
   }
@@ -53,12 +53,9 @@ public class CoreMasterContext extends MasterContext {
     return mBackupManager;
   }
 
-  /**
-   * @return the metastore factory
-   */
-  public Metastore.Factory getMetastoreFactory() {
-    return mMetastoreFactory;
-  }
+  public BlockStore.Factory getBlockStoreFactory() { return mBlockStoreFactory; }
+
+  public InodeStore.Factory getInodeStoreFactory() { return mInodeStoreFactory; }
 
   /**
    * @return the master process start time in milliseconds
@@ -88,7 +85,8 @@ public class CoreMasterContext extends MasterContext {
     private JournalSystem mJournalSystem;
     private SafeModeManager mSafeModeManager;
     private BackupManager mBackupManager;
-    private Metastore.Factory mMetastoreFactory;
+    private BlockStore.Factory mBlockStoreFactory;
+    private InodeStore.Factory mInodeStoreFactory;
     private long mStartTimeMs;
     private int mPort;
 
@@ -120,11 +118,20 @@ public class CoreMasterContext extends MasterContext {
     }
 
     /**
-     * @param metastoreFactory factory for creating a metastore
+     * @param blockStoreFactory factory for creating a block store
      * @return the builder
      */
-    public Builder setMetastoreFactory(Metastore.Factory metastoreFactory) {
-      mMetastoreFactory = metastoreFactory;
+    public Builder setBlockStoreFactory(BlockStore.Factory blockStoreFactory) {
+      mBlockStoreFactory = blockStoreFactory;
+      return this;
+    }
+
+    /**
+     * @param inodeStoreFactory factory for creating an inode store
+     * @return the builder
+     */
+    public Builder setInodeStoreFactory(InodeStore.Factory inodeStoreFactory) {
+      mInodeStoreFactory = inodeStoreFactory;
       return this;
     }
 

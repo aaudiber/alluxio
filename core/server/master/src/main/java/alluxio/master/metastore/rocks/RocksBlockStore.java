@@ -60,10 +60,14 @@ public class RocksBlockStore implements BlockStore {
    *
    * @param conf configuration
    */
-  public RocksBlockStore(InstancedConfiguration conf) throws RocksDBException {
+  public RocksBlockStore(InstancedConfiguration conf) {
     mBaseDir = conf.get(PropertyKey.MASTER_METASTORE_DIR);
     RocksDB.loadLibrary();
-    initDb();
+    try {
+      initDb();
+    } catch (RocksDBException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   @Override

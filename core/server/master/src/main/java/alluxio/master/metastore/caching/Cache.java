@@ -11,7 +11,6 @@
 
 package alluxio.master.metastore.caching;
 
-import alluxio.master.file.meta.Edge;
 import alluxio.resource.LockResource;
 import alluxio.util.CommonUtils;
 
@@ -24,6 +23,7 @@ import java.time.temporal.TemporalAmount;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import javax.annotation.Nullable;
@@ -45,6 +45,8 @@ public abstract class Cache<K, V> {
     mHighWaterMark = highWaterMark;
     mLowWaterMark = lowWaterMark;
     mEvictionThread = new EvictionThread();
+    mEvictionThread.setDaemon(true);
+    mEvictionThread.start();
   }
 
   protected abstract Optional<V> load(K key);
@@ -55,6 +57,9 @@ public abstract class Cache<K, V> {
   public Optional<V> get(K key) {
     blockIfCacheFull();
     Entry entry = mMap.computeIfAbsent(key, this::loadEntry);
+    if (entry.mValue == null) { // Indicates that the inode was removed.
+      return Optional.empty();
+    }
     checkCacheSize();
     if (entry == null) {
       return Optional.empty();
@@ -78,7 +83,18 @@ public abstract class Cache<K, V> {
   }
 
   public void remove(K key) {
-    mMap.remove(key);
+    // Set the entry so that it will be removed from the backing store when it is encountered by
+    // the eviction thread.
+    mMap.compute(key, (k, v) -> {
+      if (v == null) {
+        v = new Entry(key, null);
+      } else {
+        v.mValue = null;
+      }
+      v.mAccessed = false;
+      v.mDirty = true;
+      return v;
+    });
   }
 
   public void clear() {
@@ -87,7 +103,11 @@ public abstract class Cache<K, V> {
 
   private void blockIfCacheFull() {
     while (mMap.size() >= mMaxSize) {
-      CommonUtils.sleepMs(1000);
+      LOG.info("map size: {}, max size: {}, high water: {}", mMap.size(), mMaxSize, mHighWaterMark);
+      synchronized (mEvictionThread) {
+        mEvictionThread.notify();
+      }
+      CommonUtils.sleepMs(100);
 //      synchronized (mCacheFullMonitor) {
 //        mCacheFullMonitor.wait();
 //      }
@@ -119,17 +139,23 @@ public abstract class Cache<K, V> {
     private Iterator<Entry> mEvictionHead = Collections.emptyIterator();
     private Instant mNextAllowedSizeWarning = Instant.EPOCH;
 
+    private EvictionThread() {
+      super("eviction-thread");
+    }
+
     @Override
     public void run() {
       while (true) {
-        if (mMap.size() <= mLowWaterMark) {
+        while (mMap.size() <= mLowWaterMark) {
           synchronized (mEvictionThread) { // Same as synchronized (this)
-            try {
-              mEvictionThread.mIsSleeping = true;
-              mEvictionThread.wait();
-              mEvictionThread.mIsSleeping = false;
-            } catch (InterruptedException e) {
-              return;
+            if (mMap.size() <= mLowWaterMark) {
+              try {
+                mEvictionThread.mIsSleeping = true;
+                mEvictionThread.wait();
+                mEvictionThread.mIsSleeping = false;
+              } catch (InterruptedException e) {
+                return;
+              }
             }
           }
         }
@@ -178,7 +204,11 @@ public abstract class Cache<K, V> {
           return false;
         }
         try (LockResource lr = lockOpt.get()) {
-          evictToBackingStore(candidate.mKey, candidate.mValue);
+          if (candidate.mValue == null) {
+            removeFromBackingStore(candidate.mKey);
+          } else {
+            evictToBackingStore(candidate.mKey, candidate.mValue);
+          }
           candidate.mDirty = false;
         }
       }

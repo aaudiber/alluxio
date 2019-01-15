@@ -14,18 +14,22 @@ package alluxio.master.metastore;
 import alluxio.PropertyKey;
 import alluxio.conf.InstancedConfiguration;
 import alluxio.master.file.meta.Inode;
+import alluxio.master.file.meta.InodeLockManager;
 import alluxio.master.file.meta.InodeView;
 import alluxio.master.file.meta.MutableInode;
 import alluxio.master.file.meta.MutableInodeDirectory;
 import alluxio.master.file.options.CreateDirectoryOptions;
+import alluxio.master.metastore.caching.CachingInodeStore;
 import alluxio.master.metastore.java.HeapInodeStore;
 import alluxio.master.metastore.rocks.RocksInodeStore;
+import alluxio.util.CommonUtils;
 
 import org.rocksdb.RocksDBException;
 
 import java.util.Arrays;
 import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Function;
 
 /**
  * Inode metadata storage.
@@ -101,19 +105,39 @@ public interface InodeStore extends ReadOnlyInodeStore {
    */
   void removeChild(long parentId, String name);
 
-  static void main(String[] args) throws RocksDBException {
+  class InodeStoreArgs {
+    private final InodeLockManager mLockManager;
+
+    public InodeStoreArgs(InodeLockManager lockManager) {
+      mLockManager = lockManager;
+    }
+
+    public InodeLockManager getLockManager() {
+      return mLockManager;
+    }
+  }
+
+  interface Factory extends Function<InodeStoreArgs, InodeStore> {}
+
+  static void main(String[] args) {
     InstancedConfiguration diskConf = InstancedConfiguration.newBuilder()
         .build();
     InstancedConfiguration ramdiskConf = InstancedConfiguration.newBuilder()
         .setProperty(PropertyKey.MASTER_METASTORE_DIR, "/Volumes/ramdisk")
         .setProperty(PropertyKey.MASTER_METASTORE_ROCKS_IN_MEMORY, true)
         .build();
+    InstancedConfiguration limitedCacheConf = InstancedConfiguration.newBuilder()
+        .setProperty(PropertyKey.MASTER_METASTORE_INODE_CACHE_MAX_SIZE, "900000")
+        .build();
+    CommonUtils.sleepMs(30000);
     for (InodeStore store : Arrays.asList(
-        new HeapInodeStore(),
-        new RocksInodeStore(diskConf),
-        new RocksInodeStore(ramdiskConf)
+        new HeapInodeStore()
+//        new CachingInodeStore(new RocksInodeStore(limitedCacheConf), new InodeLockManager(), limitedCacheConf)
+//        new RocksInodeStore(diskConf),
+//        new RocksInodeStore(ramdiskConf)
     )) {
       int numInodes = 1_000_000;
+//      int numInodes = 10000;
       long s = System.currentTimeMillis();
       writeInodes(store, 0, numInodes);
       System.out.printf("Wrote %s inodes in %sms%n", numInodes, System.currentTimeMillis() - s);
@@ -127,14 +151,23 @@ public interface InodeStore extends ReadOnlyInodeStore {
         System.out.printf("Completed 1 million random reads in %sms%n",
             System.currentTimeMillis() - start);
       }
+      for (int iter = 0; iter < 5; iter++) {
+        s = System.currentTimeMillis();
+      }
     }
   }
 
   static void writeInodes(InodeStore store, int startId, int count) {
-    for (int i = startId; i < startId + count; i++) {
+    for (long i = startId; i < startId + count; i++) {
       MutableInodeDirectory dir =
           MutableInodeDirectory.create(i, 0, "x", CreateDirectoryOptions.defaults());
       store.writeInode(dir);
+    }
+  }
+
+  static void deleteInodes(InodeStore store, int startId, int count) {
+    for (long i = startId; i < startId + count; i++) {
+      store.remove(i);
     }
   }
 }

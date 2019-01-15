@@ -1220,8 +1220,8 @@ public final class PropertyKey implements Comparable<PropertyKey> {
           .setConsistencyCheckLevel(ConsistencyCheckLevel.ENFORCE)
           .setScope(Scope.MASTER)
           .build();
-  public static final PropertyKey MASTER_METASTORE_INODE_CACHE_HIGH_WATER_MARK_RATIO =
-      new Builder(Name.MASTER_METASTORE_INODE_CACHE_HIGH_WATER_MARK_RATIO)
+  public static final PropertyKey MASTER_METASTORE_INODE_CACHE_LOW_WATER_MARK_RATIO =
+      new Builder(Name.MASTER_METASTORE_INODE_CACHE_LOW_WATER_MARK_RATIO)
           .setDefaultValue("0.7")
           .setDescription("The low water mark for the inode cache, as a ratio from low water mark "
               + "to total cache size. If this is 0.7 and the max size is 10 million, the low "
@@ -1230,9 +1230,9 @@ public final class PropertyKey implements Comparable<PropertyKey> {
           .setConsistencyCheckLevel(ConsistencyCheckLevel.ENFORCE)
           .setScope(Scope.MASTER)
           .build();
-  public static final PropertyKey MASTER_METASTORE_INODE_CACHE_LOW_WATER_MARK_RATIO =
-      new Builder(Name.MASTER_METASTORE_INODE_CACHE_LOW_WATER_MARK_RATIO)
-          .setDefaultValue("0.9")
+  public static final PropertyKey MASTER_METASTORE_INODE_CACHE_HIGH_WATER_MARK_RATIO =
+      new Builder(Name.MASTER_METASTORE_INODE_CACHE_HIGH_WATER_MARK_RATIO)
+          .setDefaultValue("0.8")
           .setDescription("The high water mark for the inode cache, as a ratio from high water mark "
               + "to total cache size. If this is 0.9 and the max size is 10 million, the high "
               + "water mark value is 9 million. When the cache reaches the high "

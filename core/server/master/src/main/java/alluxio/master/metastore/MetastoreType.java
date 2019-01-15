@@ -16,26 +16,9 @@ import alluxio.master.file.meta.InodeLockManager;
 import java.util.function.Function;
 
 /**
- * A store for managing Alluxio metadata.
+ * Metastore types
  */
-public interface Metastore {
-  /**
-   * @return the inode store
-   */
-  InodeStore getInodeStore();
-
-  /**
-   * @return the block store
-   */
-  BlockStore getBlockStore();
-
-  /**
-   * Metastore types.
-   */
-  enum Type {
-    HEAP,
-    ROCKS
-  }
-
-  interface Factory extends Function<InodeLockManager, Metastore> {}
+public enum MetastoreType {
+  HEAP,
+  ROCKS
 }

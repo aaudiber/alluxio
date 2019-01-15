@@ -73,13 +73,17 @@ public class RocksInodeStore implements InodeStore {
    *
    * @param conf configuration
    */
-  public RocksInodeStore(InstancedConfiguration conf) throws RocksDBException {
+  public RocksInodeStore(InstancedConfiguration conf) {
     mConf = conf;
     mBaseDir = conf.get(PropertyKey.MASTER_METASTORE_DIR);
     RocksDB.loadLibrary();
     mDisableWAL = new WriteOptions().setDisableWAL(true);
     mReadPrefixSameAsStart = new ReadOptions().setPrefixSameAsStart(true);
-    initDb();
+    try {
+      initDb();
+    } catch (RocksDBException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   @Override

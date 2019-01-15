@@ -11,12 +11,15 @@
 
 package alluxio.master.metastore;
 
+import alluxio.master.file.meta.InodeLockManager;
 import alluxio.master.metastore.BlockStore.Block;
 import alluxio.proto.meta.Block.BlockLocation;
 import alluxio.proto.meta.Block.BlockMeta;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 import javax.annotation.concurrent.NotThreadSafe;
 
@@ -100,4 +103,8 @@ public interface BlockStore extends Iterable<Block> {
       return mMeta;
     }
   }
+
+  class BlockStoreArgs {}
+
+  interface Factory extends Function<BlockStoreArgs, BlockStore> {}
 }
