@@ -55,11 +55,6 @@ public class DelegatingReadOnlyInodeStore implements ReadOnlyInodeStore {
   }
 
   @Override
-  public Iterable<? extends Inode> getChildren(InodeDirectoryView inode) {
-    return mDelegate.getChildren(inode);
-  }
-
-  @Override
   public Optional<Long> getChildId(Long inodeId, String name) {
     return mDelegate.getChildId(inodeId, name);
   }

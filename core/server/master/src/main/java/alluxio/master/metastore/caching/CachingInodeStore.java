@@ -22,8 +22,17 @@ import alluxio.master.file.meta.MutableInode;
 import alluxio.master.metastore.InodeStore;
 import alluxio.resource.LockResource;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.NavigableSet;
+import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 
 /**
  * An inode store which caches inode tree metadata and delegates to another inode store for cache
@@ -34,10 +43,12 @@ public final class CachingInodeStore implements InodeStore {
   private final InodeLockManager mLockManager;
 
   // Cache recently-accessed inodes.
-  private final Cache<Long, MutableInode<?>> mInodeCache;
+  private final InodeCache mInodeCache;
 
   // Cache recently-accessed inode tree edges.
-  private final Cache<Edge, Long> mEdgeCache;
+  private final EdgeCache mEdgeCache;
+
+  private final Map<Long, List<Long>> mListingCache;
 
   /**
    * @param backingStore the backing inode store
@@ -100,16 +111,52 @@ public final class CachingInodeStore implements InodeStore {
 
   @Override
   public Iterable<? extends Inode> getChildren(Long inodeId) {
+    // Merge together
+    Iterator<Long> cachedChildren = new ArrayList<>(mEdgeCache.getChildIds(inodeId)).iterator();
     Iterator<Long> baseIterator = mBackingStore.getChildIds(inodeId).iterator();
     return () -> new Iterator<Inode>() {
+      private Inode nextCached = null;
+      private Inode nextBase = null;
+
       @Override
       public boolean hasNext() {
-        return baseIterator.hasNext();
+        advance();
+        return nextCached != null || nextBase != null;
       }
 
       @Override
       public Inode next() {
-        return get(baseIterator.next()).get();
+        if (!hasNext()) {
+          throw new NoSuchElementException("No more children to iterate over");
+        }
+        if (nextBase == null) {
+          return nextCached;
+        }
+        if (nextCached == null) {
+          return nextBase;
+        }
+        int comparison = nextCached.getName().compareTo(nextBase.getName());
+        if (comparison == 0) {
+          // Duplicate children.
+          nextBase = null;
+          nextCached = null;
+          return nextCached;
+        } else if (comparison < 0){
+          nextCached = null;
+          return nextCached;
+        } else {
+          nextBase = null;
+          return nextBase;
+        }
+      }
+
+      private void advance() {
+        if (nextCached == null && cachedChildren.hasNext()) {
+          nextCached = get(cachedChildren.next()).get();
+        }
+        if (nextBase == null && baseIterator.hasNext()) {
+          nextBase = get(baseIterator.next()).get();
+        }
       }
     };
   }
@@ -156,8 +203,14 @@ public final class CachingInodeStore implements InodeStore {
   }
 
   private class EdgeCache extends Cache<Edge, Long> {
+    Map<Long, ConcurrentSkipListMap<String, Long>> mIdToChildMap = new ConcurrentHashMap<>();
+
     public EdgeCache(int maxSize, int highWaterMark, int lowWaterMark) {
       super(maxSize, highWaterMark, lowWaterMark);
+    }
+
+    public Collection<Long> getChildIds(Long inodeId) {
+      return mIdToChildMap.get(inodeId).values();
     }
 
     @Override
@@ -178,6 +231,31 @@ public final class CachingInodeStore implements InodeStore {
     @Override
     protected void removeFromBackingStore(Edge edge) {
       mBackingStore.removeChild(edge.getId(), edge.getName());
+    }
+
+    @Override
+    protected void onAdd(Edge edge, Long childId) {
+      mIdToChildMap.compute(edge.getId(), (key, value) -> {
+        if (value == null) {
+          value = new ConcurrentSkipListMap<>();
+        }
+        value.put(edge.getName(), childId);
+        return value;
+      });
+    }
+
+    @Override
+    protected void onRemove(Edge edge, Long childId) {
+      mIdToChildMap.compute(edge.getId(), (key, value) -> {
+        if (value == null) {
+          return null;
+        }
+        value.remove(edge.getName());
+        if (value.isEmpty()) {
+          return null;
+        }
+        return value;
+      });
     }
   }
 }

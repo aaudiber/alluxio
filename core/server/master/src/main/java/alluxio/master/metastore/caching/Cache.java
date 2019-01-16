@@ -46,6 +46,7 @@ public abstract class Cache<K, V> {
     mLowWaterMark = lowWaterMark;
     mEvictionThread = new EvictionThread();
     mEvictionThread.setDaemon(true);
+    mEvictionThread.setPriority(6);
     mEvictionThread.start();
   }
 
@@ -53,17 +54,16 @@ public abstract class Cache<K, V> {
   protected abstract Optional<LockResource> tryLock(K key);
   protected abstract void evictToBackingStore(K key, V value);
   protected abstract void removeFromBackingStore(K key);
+  protected void onAdd(K key, V value) {}
+  protected void onRemove(K key, V value) {}
 
   public Optional<V> get(K key) {
     blockIfCacheFull();
     Entry entry = mMap.computeIfAbsent(key, this::loadEntry);
-    if (entry.mValue == null) { // Indicates that the inode was removed.
+    if (entry == null || entry.mValue == null) {
       return Optional.empty();
     }
     checkCacheSize();
-    if (entry == null) {
-      return Optional.empty();
-    }
     entry.mAccessed = true;
     return Optional.of(entry.mValue);
   }
@@ -72,6 +72,7 @@ public abstract class Cache<K, V> {
     blockIfCacheFull();
     mMap.compute(key, (prevKey, prevValue) -> {
       if (prevValue == null) {
+        onAdd(key, value);
         return new Entry(key, value);
       }
       prevValue.mValue = value;
@@ -85,15 +86,16 @@ public abstract class Cache<K, V> {
   public void remove(K key) {
     // Set the entry so that it will be removed from the backing store when it is encountered by
     // the eviction thread.
-    mMap.compute(key, (k, v) -> {
-      if (v == null) {
-        v = new Entry(key, null);
+    mMap.compute(key, (k, entry) -> {
+      if (entry == null) {
+        entry = new Entry(key, null);
       } else {
-        v.mValue = null;
+        onRemove(key, entry.mValue);
+        entry.mValue = null;
       }
-      v.mAccessed = false;
-      v.mDirty = true;
-      return v;
+      entry.mAccessed = false;
+      entry.mDirty = true;
+      return entry;
     });
   }
 
@@ -126,6 +128,7 @@ public abstract class Cache<K, V> {
   private Entry loadEntry(K key) {
     Optional<V> value = load(key);
     if (value.isPresent()) {
+      onAdd(key, value.get());
       return new Entry(key, value.get());
     }
     return null;
@@ -212,10 +215,11 @@ public abstract class Cache<K, V> {
           candidate.mDirty = false;
         }
       }
-      return null == mMap.computeIfPresent(candidate.mKey, (key, value) -> {
-        if (value.mDirty) {
-          return value; // Inode must have been written since we evicted.
+      return null == mMap.computeIfPresent(candidate.mKey, (key, entry) -> {
+        if (entry.mDirty) {
+          return entry; // entry must have been written since we evicted.
         }
+        onRemove(key, entry.mValue);
         return null;
       });
     }
