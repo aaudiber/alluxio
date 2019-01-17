@@ -51,9 +51,6 @@ public abstract class Cache<K, V> {
   }
 
   protected abstract Optional<V> load(K key);
-  protected abstract Optional<LockResource> tryLock(K key);
-  protected abstract void evictToBackingStore(K key, V value);
-  protected abstract void removeFromBackingStore(K key);
   protected void onAdd(K key, V value) {}
   protected void onRemove(K key, V value) {}
 
@@ -129,7 +126,9 @@ public abstract class Cache<K, V> {
     Optional<V> value = load(key);
     if (value.isPresent()) {
       onAdd(key, value.get());
-      return new Entry(key, value.get());
+      Entry entry = new Entry(key, value.get());
+      entry.mDirty = false;
+      return entry;
     }
     return null;
   }
@@ -202,17 +201,8 @@ public abstract class Cache<K, V> {
         return false;
       }
       if (candidate.mDirty) {
-        Optional<LockResource> lockOpt = tryLock(candidate.mKey);
-        if (!lockOpt.isPresent()) {
+        if (!flush(candidate)) {
           return false;
-        }
-        try (LockResource lr = lockOpt.get()) {
-          if (candidate.mValue == null) {
-            removeFromBackingStore(candidate.mKey);
-          } else {
-            evictToBackingStore(candidate.mKey, candidate.mValue);
-          }
-          candidate.mDirty = false;
         }
       }
       return null == mMap.computeIfPresent(candidate.mKey, (key, entry) -> {
@@ -225,11 +215,18 @@ public abstract class Cache<K, V> {
     }
   }
 
-  private class Entry {
-    private K mKey;
-    private V mValue;
-    private volatile boolean mAccessed = true;
-    private volatile boolean mDirty = true;
+  /**
+   * @param candidate the entry to flush
+   * @return whether the entry was successfully flushed
+   */
+  protected abstract boolean flush(Entry candidate);
+
+  protected class Entry {
+    protected K mKey;
+    protected V mValue;
+    protected volatile boolean mDirty = true;
+
+    private volatile boolean mAccessed = false;
 
     private Entry(K key, V value) {
       mKey = key;

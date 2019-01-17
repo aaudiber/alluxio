@@ -23,16 +23,17 @@ import alluxio.master.metastore.InodeStore;
 import alluxio.resource.LockResource;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
-import java.util.NavigableSet;
+import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.SortedMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiFunction;
 
 /**
  * An inode store which caches inode tree metadata and delegates to another inode store for cache
@@ -48,7 +49,7 @@ public final class CachingInodeStore implements InodeStore {
   // Cache recently-accessed inode tree edges.
   private final EdgeCache mEdgeCache;
 
-  private final Map<Long, List<Long>> mListingCache;
+  private final ListingCache mListingCache;
 
   /**
    * @param backingStore the backing inode store
@@ -65,6 +66,7 @@ public final class CachingInodeStore implements InodeStore {
 
     mInodeCache = new InodeCache(maxSize, highWaterMark, lowWaterMark);
     mEdgeCache = new EdgeCache(maxSize, highWaterMark, lowWaterMark);
+    mListingCache = new ListingCache();
   }
 
   @Override
@@ -91,11 +93,13 @@ public final class CachingInodeStore implements InodeStore {
 
   @Override
   public void addChild(long parentId, String childName, Long childId) {
+    System.out.printf("Add %s->%s(%s)%n", parentId, childName, childId);
     mEdgeCache.put(new Edge(parentId, childName), childId);
   }
 
   @Override
   public void removeChild(long parentId, String name) {
+    System.out.printf("Remove %s->%s%n", parentId, name);
     mEdgeCache.remove(new Edge(parentId, name));
   }
 
@@ -106,56 +110,38 @@ public final class CachingInodeStore implements InodeStore {
 
   @Override
   public Iterable<Long> getChildIds(Long inodeId) {
-    return mBackingStore.getChildIds(inodeId);
+    return () -> mListingCache.getChildIds(inodeId).iterator();
   }
 
   @Override
   public Iterable<? extends Inode> getChildren(Long inodeId) {
-    // Merge together
-    Iterator<Long> cachedChildren = new ArrayList<>(mEdgeCache.getChildIds(inodeId)).iterator();
-    Iterator<Long> baseIterator = mBackingStore.getChildIds(inodeId).iterator();
+    Iterator<Long> childIterator = mListingCache.getChildIds(inodeId).iterator();
     return () -> new Iterator<Inode>() {
-      private Inode nextCached = null;
-      private Inode nextBase = null;
+      private Inode mNext = null;
 
       @Override
       public boolean hasNext() {
         advance();
-        return nextCached != null || nextBase != null;
+        return mNext != null;
       }
 
       @Override
       public Inode next() {
         if (!hasNext()) {
-          throw new NoSuchElementException("No more children to iterate over");
+          throw new NoSuchElementException("No more children available");
         }
-        if (nextBase == null) {
-          return nextCached;
-        }
-        if (nextCached == null) {
-          return nextBase;
-        }
-        int comparison = nextCached.getName().compareTo(nextBase.getName());
-        if (comparison == 0) {
-          // Duplicate children.
-          nextBase = null;
-          nextCached = null;
-          return nextCached;
-        } else if (comparison < 0){
-          nextCached = null;
-          return nextCached;
-        } else {
-          nextBase = null;
-          return nextBase;
-        }
+        Inode next = mNext;
+        mNext = null;
+        return next;
       }
 
       private void advance() {
-        if (nextCached == null && cachedChildren.hasNext()) {
-          nextCached = get(cachedChildren.next()).get();
-        }
-        if (nextBase == null && baseIterator.hasNext()) {
-          nextBase = get(baseIterator.next()).get();
+        while (mNext == null && childIterator.hasNext()) {
+          Long nextId = childIterator.next();
+          Optional<Inode> nextInode = get(nextId);
+          if (nextInode.isPresent()) {
+            mNext = nextInode.get();
+          }
         }
       }
     };
@@ -173,7 +159,11 @@ public final class CachingInodeStore implements InodeStore {
 
   @Override
   public boolean hasChildren(InodeDirectoryView inode) {
-    return mBackingStore.hasChildren(inode);
+    Optional<Collection<Long>> cached = mListingCache.getCachedChildIds(inode.getId());
+    if (cached.isPresent()) {
+      return cached.get().isEmpty();
+    }
+    return !mEdgeCache.getChildIds(inode.getId()).isEmpty() || mBackingStore.hasChildren(inode);
   }
 
   private class InodeCache extends Cache<Long, MutableInode<?>> {
@@ -187,30 +177,33 @@ public final class CachingInodeStore implements InodeStore {
     }
 
     @Override
-    protected Optional<LockResource> tryLock(Long inodeId) {
-      return mLockManager.tryLockInode(inodeId, LockMode.WRITE);
-    }
-
-    @Override
-    protected void evictToBackingStore(Long id, MutableInode<?> inode) {
-      mBackingStore.writeInode(inode);
-    }
-
-    @Override
-    protected void removeFromBackingStore(Long inodeId) {
-      mBackingStore.remove(inodeId);
+    protected boolean flush(Entry entry) {
+      Optional<LockResource> lockOpt = mLockManager.tryLockInode(entry.mKey, LockMode.WRITE);
+      if (!lockOpt.isPresent()) {
+        return false;
+      }
+      try (LockResource lr = lockOpt.get()) {
+        if (entry.mValue == null) {
+          mBackingStore.remove(entry.mKey);
+        } else {
+          mBackingStore.writeInode(entry.mValue);
+        }
+        entry.mDirty = false;
+      }
+      return true;
     }
   }
 
   private class EdgeCache extends Cache<Edge, Long> {
+    private ConcurrentSkipListMap<String, Long> EMPTY = new ConcurrentSkipListMap<>();
     Map<Long, ConcurrentSkipListMap<String, Long>> mIdToChildMap = new ConcurrentHashMap<>();
 
     public EdgeCache(int maxSize, int highWaterMark, int lowWaterMark) {
       super(maxSize, highWaterMark, lowWaterMark);
     }
 
-    public Collection<Long> getChildIds(Long inodeId) {
-      return mIdToChildMap.get(inodeId).values();
+    public ConcurrentSkipListMap<String, Long> getChildIds(Long inodeId) {
+      return mIdToChildMap.getOrDefault(inodeId, EMPTY);
     }
 
     @Override
@@ -219,22 +212,37 @@ public final class CachingInodeStore implements InodeStore {
     }
 
     @Override
-    protected Optional<LockResource> tryLock(Edge edge) {
-      return mLockManager.tryLockEdge(edge, LockMode.WRITE);
-    }
-
-    @Override
-    protected void evictToBackingStore(Edge edge, Long id) {
-      mBackingStore.addChild(edge.getId(), edge.getName(), id);
-    }
-
-    @Override
-    protected void removeFromBackingStore(Edge edge) {
-      mBackingStore.removeChild(edge.getId(), edge.getName());
+    protected boolean flush(Entry entry) {
+      Optional<LockResource> lockOpt = mLockManager.tryLockEdge(entry.mKey, LockMode.WRITE);
+      if (!lockOpt.isPresent()) {
+        return false;
+      }
+      try (LockResource lr = lockOpt.get()) {
+        if (entry.mValue == null) {
+          mBackingStore.removeChild(entry.mKey.getId(), entry.mKey.getName());
+        } else {
+          mBackingStore.addChild(entry.mKey.getId(), entry.mKey.getName(), entry.mValue);
+        }
+        entry.mDirty = false;
+      }
+      return true;
     }
 
     @Override
     protected void onAdd(Edge edge, Long childId) {
+      mListingCache.compute(edge.getId(), (key, value) -> {
+        System.out.printf("onAdd %s->%s(%s)%n", edge.getId(), edge.getName(), childId);
+        if (value != null) {
+          synchronized (value) {
+            value.mModified = true;
+            if (value.mChildren != null) {
+              System.out.printf("Put %s->%s%n", edge.getId(), edge.getName());
+              value.mChildren.put(edge.getName(), childId);
+            }
+          }
+        }
+        return value;
+      });
       mIdToChildMap.compute(edge.getId(), (key, value) -> {
         if (value == null) {
           value = new ConcurrentSkipListMap<>();
@@ -246,6 +254,17 @@ public final class CachingInodeStore implements InodeStore {
 
     @Override
     protected void onRemove(Edge edge, Long childId) {
+      mListingCache.compute(edge.getId(), (key, value) -> {
+        if (value != null) {
+          synchronized (value) {
+            value.mModified = true;
+            if (value.mChildren != null) {
+              value.mChildren.remove(edge.getName());
+            }
+          }
+        }
+        return value;
+      });
       mIdToChildMap.compute(edge.getId(), (key, value) -> {
         if (value == null) {
           return null;
@@ -257,5 +276,94 @@ public final class CachingInodeStore implements InodeStore {
         return value;
       });
     }
+  }
+
+  private class ListingCache {
+    private Map<Long, ListingCacheEntry> mMap = new ConcurrentHashMap<>();
+
+    public void compute(Long id,
+        BiFunction<Long, ListingCacheEntry, ListingCacheEntry> remappingFunction) {
+      mMap.compute(id, remappingFunction);
+    }
+
+    public Optional<Collection<Long>> getCachedChildIds(Long inodeId) {
+      ListingCacheEntry entry = mMap.get(inodeId);
+      if (entry != null && entry.mChildren != null) {
+        return Optional.of(entry.mChildren.values());
+      }
+      return Optional.empty();
+    }
+
+    public Collection<Long> getChildIds(Long inodeId) {
+      ListingCacheEntry entry = mMap.computeIfAbsent(inodeId, x -> new ListingCacheEntry());
+      if (entry.mChildren != null) {
+        System.out.printf("Get cached ids: %s%n", entry.mChildren.values());
+        return entry.mChildren.values();
+      }
+      if (entry.mLoading.compareAndSet(false, true)) {
+        synchronized (entry) {
+          if (entry.mChildren != null) {
+            System.out.printf("Get cached ids: %s%n", entry.mChildren.values());
+            return entry.mChildren.values();
+          }
+          entry.mModified = false;
+        }
+        SortedMap<String, Long> listing = computeFullListing(inodeId);
+        synchronized (entry) {
+          if (!entry.mModified) {
+            entry.mChildren = new ConcurrentSkipListMap<>(listing);
+          }
+          System.out.printf("Get loaded ids: %s%n", entry.mChildren.values());
+          return listing.values();
+        }
+      } else {
+        System.out.printf("Get freshly computed ids: %s%n", entry.mChildren.values());
+        return computeFullListing(inodeId).values();
+      }
+    }
+
+    private SortedMap<String, Long> computeFullListing(Long inodeId) {
+      Iterator<Entry<String, Long>> cachedChildren =
+          new ArrayList<>(mEdgeCache.getChildIds(inodeId).entrySet()).iterator();
+      Iterator<? extends Inode> flushedChildren = mBackingStore.getChildren(inodeId).iterator();
+      ConcurrentSkipListMap<String, Long> result = new ConcurrentSkipListMap<>();
+      Entry<String, Long> cached = nextOrNull(cachedChildren);
+      Inode flushed = nextOrNull(flushedChildren);
+      while (cached != null && flushed != null) {
+        int comparison = cached.getKey().compareTo(flushed.getName());
+        if (comparison == 0) {
+          // Duplicate children.
+          flushed = nextOrNull(flushedChildren);
+          cached = nextOrNull(cachedChildren);
+          result.put(cached.getKey(), cached.getValue());
+        } else if (comparison < 0) {
+          cached = nextOrNull(cachedChildren);
+          result.put(cached.getKey(), cached.getValue());
+        } else {
+          flushed = nextOrNull(flushedChildren);
+          result.put(flushed.getName(), flushed.getId());
+        }
+      }
+      while (cached != null) {
+        result.put(cached.getKey(), cached.getValue());
+        cached = nextOrNull(cachedChildren);
+      }
+      while (flushed != null) {
+        result.put(flushed.getName(), flushed.getId());
+        flushed = nextOrNull(flushedChildren);
+      }
+      return result;
+    }
+
+    private <T> T nextOrNull(Iterator<T> it) {
+      return it.hasNext() ? it.next() : null;
+    }
+  }
+
+  private class ListingCacheEntry {
+    private boolean mModified = false;
+    private boolean mAccessed = false;
+    private AtomicBoolean mLoading = new AtomicBoolean(false);
+    private ConcurrentSkipListMap<String, Long> mChildren = null;
   }
 }
