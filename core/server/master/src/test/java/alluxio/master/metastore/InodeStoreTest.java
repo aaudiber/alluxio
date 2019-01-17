@@ -111,10 +111,11 @@ public class InodeStoreTest {
     mStore.writeInode(ROOT);
     MutableInodeDirectory curr = ROOT;
     List<Long> fileIds = new ArrayList<>();
+    long numDirs = 100;
     // Create 100 nested directories, each containing a file.
-    for (int i = 1; i < 100; i++) {
+    for (int i = 1; i < numDirs; i++) {
       MutableInodeDirectory dir = inodeDir(i, curr.getId(), "dir" + i);
-      MutableInodeFile file = inodeFile(i + 100, i, "file" + i);
+      MutableInodeFile file = inodeFile(i + 1000, i, "file" + i);
       fileIds.add(file.getId());
       mStore.writeInode(dir);
       mStore.writeInode(file);
@@ -124,7 +125,7 @@ public class InodeStoreTest {
     }
 
     // Check presence and delete files.
-    for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < numDirs; i++) {
       assertTrue(mStore.get(i).isPresent());
     }
     for (Long i : fileIds) {
@@ -133,19 +134,21 @@ public class InodeStoreTest {
       mStore.remove(inode);
       mStore.removeChild(inode.getParentId(), inode.getName());
       assertFalse(mStore.get(i).isPresent());
+      assertFalse(mStore.getChild(inode.getParentId(), inode.getName()).isPresent());
     }
 
+    long middleDir = numDirs / 2;
     // Rename a directory
-    MutableInodeDirectory dir = mStore.getMutable(50).get().asDirectory();
-    mStore.removeChild(49, "dir50");
+    MutableInodeDirectory dir = mStore.getMutable(middleDir).get().asDirectory();
+    mStore.removeChild(middleDir - 1, "dir" + middleDir);
     mStore.addChild(ROOT.getId(), dir);
     dir.setParentId(ROOT.getId());
     mStore.writeInode(dir);
 
     Optional<Inode> renamed = mStore.getChild(ROOT, dir.getName());
     assertTrue(renamed.isPresent());
-    assertTrue(mStore.getChild(renamed.get().asDirectory(), "dir51").isPresent());
-    assertEquals(0, Iterables.size(mStore.getChildren(mStore.get(49).get().asDirectory())));
+    assertTrue(mStore.getChild(renamed.get().asDirectory(), "dir" + (middleDir + 1)).isPresent());
+    assertEquals(0, Iterables.size(mStore.getChildren(mStore.get(middleDir - 1).get().asDirectory())));
   }
 
   private static MutableInodeDirectory inodeDir(long id, long parentId, String name) {

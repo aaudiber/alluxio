@@ -11,9 +11,10 @@
 
 package alluxio.master.metastore.caching;
 
-import alluxio.resource.LockResource;
+import alluxio.metrics.MetricsSystem;
 import alluxio.util.CommonUtils;
 
+import com.codahale.metrics.Gauge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,7 +24,6 @@ import java.time.temporal.TemporalAmount;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import javax.annotation.Nullable;
@@ -38,12 +38,13 @@ public abstract class Cache<K, V> {
   private final int mLowWaterMark;
 
   private final EvictionThread mEvictionThread;
-//  private final Object mCacheFullMonitor = new Object();
 
-  public Cache(int maxSize, int highWaterMark, int lowWaterMark) {
+  public Cache(int maxSize, int highWaterMark, int lowWaterMark, String name) {
     mMaxSize = maxSize;
     mHighWaterMark = highWaterMark;
     mLowWaterMark = lowWaterMark;
+    MetricsSystem.registerGaugeIfAbsent(MetricsSystem.getMetricName(name + "-size"),
+        () -> mMap.size());
     mEvictionThread = new EvictionThread();
     mEvictionThread.setDaemon(true);
     mEvictionThread.setPriority(6);
@@ -52,7 +53,8 @@ public abstract class Cache<K, V> {
 
   protected abstract Optional<V> load(K key);
   protected void onAdd(K key, V value) {}
-  protected void onRemove(K key, V value) {}
+  protected void onEvict(K key, V value) {}
+  protected void onRemove(K key) {}
 
   public Optional<V> get(K key) {
     blockIfCacheFull();
@@ -87,9 +89,9 @@ public abstract class Cache<K, V> {
       if (entry == null) {
         entry = new Entry(key, null);
       } else {
-        onRemove(key, entry.mValue);
         entry.mValue = null;
       }
+      onRemove(key);
       entry.mAccessed = false;
       entry.mDirty = true;
       return entry;
@@ -147,10 +149,14 @@ public abstract class Cache<K, V> {
 
     @Override
     public void run() {
+      long evictionStart = System.currentTimeMillis();
+      long evictionCount = 0;
       while (true) {
         while (mMap.size() <= mLowWaterMark) {
           synchronized (mEvictionThread) { // Same as synchronized (this)
             if (mMap.size() <= mLowWaterMark) {
+              LOG.debug("Evicted {} entries in {}ms", evictionCount,
+                  System.currentTimeMillis() - evictionStart);
               try {
                 mEvictionThread.mIsSleeping = true;
                 mEvictionThread.wait();
@@ -158,11 +164,16 @@ public abstract class Cache<K, V> {
               } catch (InterruptedException e) {
                 return;
               }
+            } else {
+              evictionStart = System.currentTimeMillis();
+              evictionCount = 0;
             }
           }
         }
+
         // TODO(andrew): Implement batch eviction
         evictEntry();
+        evictionCount++;
         if (mMap.size() >= mMaxSize) {
           Instant now = Instant.now();
           if (now.isAfter(mNextAllowedSizeWarning)) {
@@ -209,7 +220,7 @@ public abstract class Cache<K, V> {
         if (entry.mDirty) {
           return entry; // entry must have been written since we evicted.
         }
-        onRemove(key, entry.mValue);
+        onEvict(key, entry.mValue);
         return null;
       });
     }

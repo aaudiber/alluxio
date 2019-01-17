@@ -11,6 +11,8 @@
 
 package alluxio.master.metastore.java;
 
+import static java.util.stream.Collectors.toList;
+
 import alluxio.master.file.meta.Inode;
 import alluxio.master.file.meta.MutableInode;
 import alluxio.master.file.meta.InodeDirectoryView;
@@ -29,8 +31,8 @@ import java.util.concurrent.ConcurrentSkipListMap;
  */
 public class HeapInodeStore implements InodeStore {
   private final Map<Long, MutableInode<?>> mInodes = new ConcurrentHashMap<>();
-  // Map from inode id to children of that inode. The internal maps are ordered by child name.
-  private final Map<Long, Map<String, MutableInode<?>>> mEdges = new ConcurrentHashMap<>();
+  // Map from inode id to ids of children of that inode. The inner maps are ordered by child name.
+  private final Map<Long, Map<String, Long>> mEdges = new ConcurrentHashMap<>();
 
   @Override
   public void remove(Long inodeId) {
@@ -43,14 +45,9 @@ public class HeapInodeStore implements InodeStore {
   }
 
   @Override
-  public void addChild(long parentId, InodeView child) {
-    mEdges.putIfAbsent(parentId, new ConcurrentSkipListMap<>());
-    mEdges.get(parentId).put(child.getName(), mInodes.get(child.getId()));
-  }
-
-  @Override
   public void addChild(long parentId, String childName, Long childId) {
-    addChild(parentId, get(childId).get());
+    mEdges.putIfAbsent(parentId, new ConcurrentSkipListMap<>());
+    mEdges.get(parentId).put(childName, childId);
   }
 
   @Override
@@ -70,22 +67,29 @@ public class HeapInodeStore implements InodeStore {
 
   @Override
   public Iterable<Long> getChildIds(Long inodeId) {
-    return StreamUtils.map(MutableInode::getId, children(inodeId).values());
+    return children(inodeId).values();
   }
 
   @Override
   public Iterable<? extends Inode> getChildren(Long inodeId) {
-    return StreamUtils.map(Inode::wrap, children(inodeId).values());
+    return children(inodeId).values().stream()
+        .map(this::get)
+        .filter(Optional::isPresent)
+        .map(Optional::get)
+        .map(Inode::wrap)
+        .collect(toList());
   }
 
   @Override
   public Optional<Long> getChildId(Long inodeId, String child) {
-    return Optional.ofNullable(children(inodeId).get(child)).map(MutableInode::getId);
+    return Optional.ofNullable(children(inodeId).get(child));
   }
 
   @Override
   public Optional<Inode> getChild(Long inodeId, String child) {
-    return Optional.ofNullable(children(inodeId).get(child)).map(Inode::wrap);
+    return getChildId(inodeId, child)
+        .flatMap(this::get)
+        .map(Inode::wrap);
   }
 
   @Override
@@ -99,7 +103,7 @@ public class HeapInodeStore implements InodeStore {
     mEdges.clear();
   }
 
-  private Map<String, MutableInode<?>> children(long id) {
+  private Map<String, Long> children(long id) {
     return mEdges.getOrDefault(id, Collections.emptyMap());
   }
 }

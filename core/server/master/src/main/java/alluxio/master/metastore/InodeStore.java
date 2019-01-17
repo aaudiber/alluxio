@@ -24,8 +24,6 @@ import alluxio.master.metastore.java.HeapInodeStore;
 import alluxio.master.metastore.rocks.RocksInodeStore;
 import alluxio.util.CommonUtils;
 
-import org.rocksdb.RocksDBException;
-
 import java.util.Arrays;
 import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
@@ -71,6 +69,16 @@ public interface InodeStore extends ReadOnlyInodeStore {
    * @param inode the inode to write
    */
   void writeInode(MutableInode<?> inode);
+
+  /**
+   * Adds the given inode, or overwrites it if it exists.
+   *
+   * @param inode the inode to write
+   * @param newInodeHint a hint that the inode is being newly created
+   */
+  default void writeInode(MutableInode<?> inode, boolean newInodeHint) {
+    writeInode(inode);
+  }
 
   /**
    * Removes all inodes and edges.
@@ -126,14 +134,23 @@ public interface InodeStore extends ReadOnlyInodeStore {
         .setProperty(PropertyKey.MASTER_METASTORE_DIR, "/Volumes/ramdisk")
         .setProperty(PropertyKey.MASTER_METASTORE_ROCKS_IN_MEMORY, true)
         .build();
-    InstancedConfiguration limitedCacheConf = InstancedConfiguration.newBuilder()
+    InstancedConfiguration cache50k = InstancedConfiguration.newBuilder()
+        .setProperty(PropertyKey.MASTER_METASTORE_INODE_CACHE_MAX_SIZE, "50000")
+        .build();
+    InstancedConfiguration cache900k = InstancedConfiguration.newBuilder()
         .setProperty(PropertyKey.MASTER_METASTORE_INODE_CACHE_MAX_SIZE, "900000")
         .build();
+    InstancedConfiguration cache2mil = InstancedConfiguration.newBuilder()
+        .setProperty(PropertyKey.MASTER_METASTORE_INODE_CACHE_MAX_SIZE, "2000000")
+        .build();
+
     CommonUtils.sleepMs(30000);
     for (InodeStore store : Arrays.asList(
-        new HeapInodeStore()
-//        new CachingInodeStore(new RocksInodeStore(limitedCacheConf), new InodeLockManager(), limitedCacheConf)
-//        new RocksInodeStore(diskConf),
+        new HeapInodeStore(),
+        new CachingInodeStore(new RocksInodeStore(cache2mil), new InodeLockManager(), cache2mil),
+        new CachingInodeStore(new RocksInodeStore(cache900k), new InodeLockManager(), cache900k),
+        new CachingInodeStore(new RocksInodeStore(cache50k), new InodeLockManager(), cache50k),
+        new RocksInodeStore(diskConf)
 //        new RocksInodeStore(ramdiskConf)
     )) {
       int numInodes = 1_000_000;

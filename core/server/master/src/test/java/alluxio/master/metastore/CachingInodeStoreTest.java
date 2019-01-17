@@ -55,7 +55,7 @@ public class CachingInodeStoreTest {
     mStore = new CachingInodeStore(mBackingStore, new InodeLockManager(),
         InstancedConfiguration.newBuilder()
             .setProperty(PropertyKey.MASTER_METASTORE_INODE_CACHE_MAX_SIZE, CACHE_SIZE).build());
-    mStore.writeInode(TEST_INODE_DIR);
+    mStore.writeInode(TEST_INODE_DIR, true);
   }
 
   @Test
@@ -113,7 +113,7 @@ public class CachingInodeStoreTest {
       MutableInodeFile child =
           MutableInodeFile.create(id, TEST_INODE_ID, "child" + id, 0, CreateFileOptions.defaults());
       children.add(Inode.wrap(child));
-      mStore.writeInode(child);
+      mStore.writeInode(child, true);
       mStore.addChild(TEST_INODE_ID, child);
     }
     assertEquals(10, Iterables.size(mStore.getChildren(TEST_INODE_DIR)));
@@ -138,6 +138,8 @@ public class CachingInodeStoreTest {
   private void verifyNoBackingStoreReads() {
     verify(mBackingStore, Mockito.times(0)).getChild(anyLong(), anyString());
     verify(mBackingStore, Mockito.times(0)).getChildId(anyLong(), anyString());
+    verify(mBackingStore, Mockito.times(0)).getChildren(anyLong());
+    verify(mBackingStore, Mockito.times(0)).getChildIds(anyLong());
     verify(mBackingStore, Mockito.times(0)).get(anyLong());
     verify(mBackingStore, Mockito.times(0)).getMutable(anyLong());
   }
