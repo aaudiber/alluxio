@@ -107,6 +107,28 @@ public class InodeStoreTest {
   }
 
   @Test
+  public void addRemoveAddList() {
+    mStore.writeInode(ROOT);
+    for (int i = 1; i < 10; i++) {
+      MutableInodeFile file = inodeFile(i, 0, "file" + i);
+      mStore.writeInode(file);
+      mStore.addChild(ROOT.getId(), file);
+    }
+    assertEquals(9, Iterables.size(mStore.getChildren(ROOT)));
+
+    for (Inode child : mStore.getChildren(ROOT)) {
+      mStore.removeChild(ROOT.getId(), child.getName());
+      mStore.remove(child);
+    }
+    for (int i = 1; i < 10; i++) {
+      MutableInodeFile file = inodeFile(i, 0, "file" + i);
+      mStore.writeInode(file);
+      mStore.addChild(ROOT.getId(), file);
+    }
+    assertEquals(9, Iterables.size(mStore.getChildren(ROOT)));
+  }
+
+  @Test
   public void manyOperations() {
     mStore.writeInode(ROOT);
     MutableInodeDirectory curr = ROOT;

@@ -14,7 +14,6 @@ package alluxio.master.metastore.caching;
 import alluxio.metrics.MetricsSystem;
 import alluxio.util.CommonUtils;
 
-import com.codahale.metrics.Gauge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,19 +64,19 @@ public abstract class Cache<K, V> {
       return Optional.empty();
     }
     checkCacheSize();
-    entry.mAccessed = true;
+    entry.mReferenced = true;
     return Optional.of(entry.mValue);
   }
 
   public void put(K key, V value) {
     blockIfCacheFull();
     mMap.compute(key, (prevKey, prevValue) -> {
-      if (prevValue == null) {
+      if (prevValue == null || prevValue.mValue == null) {
         onAdd(key, value);
         return new Entry(key, value);
       }
       prevValue.mValue = value;
-      prevValue.mAccessed = true;
+      prevValue.mReferenced = true;
       prevValue.mDirty = true;
       return prevValue;
     });
@@ -94,7 +93,7 @@ public abstract class Cache<K, V> {
         entry.mValue = null;
       }
       onRemove(key);
-      entry.mAccessed = false;
+      entry.mReferenced = false;
       entry.mDirty = true;
       return entry;
     });
@@ -172,7 +171,6 @@ public abstract class Cache<K, V> {
           }
         }
 
-        // TODO(andrew): Implement batch eviction
         evictEntry();
         evictionCount++;
         if (mMap.size() >= mMaxSize) {
@@ -208,8 +206,8 @@ public abstract class Cache<K, V> {
     }
 
     private boolean tryEvictEntry(Entry candidate) {
-      if (candidate.mAccessed) {
-        candidate.mAccessed = false;
+      if (candidate.mReferenced) {
+        candidate.mReferenced = false;
         return false;
       }
       if (candidate.mDirty) {
@@ -228,6 +226,10 @@ public abstract class Cache<K, V> {
   }
 
   /**
+   * Flushes the candidate to the backing store.
+   *
+   * The subclass is responsible for setting the candidate's mDirty field to false on success.
+   *
    * @param candidate the entry to flush
    * @return whether the entry was successfully flushed
    */
@@ -236,9 +238,15 @@ public abstract class Cache<K, V> {
   protected class Entry {
     protected K mKey;
     protected V mValue;
+
+    // Whether the entry is out of sync with the backing store. If mDirty is true, the entry must be
+    // flushed to the backing store before it can be evicted.
     protected volatile boolean mDirty = true;
 
-    private volatile boolean mAccessed = false;
+    // Whether the entry has been recently accessed. Accesses set the bit to true, while the
+    // eviction thread sets it to false. This is the same as the "referenced" bit described in the
+    // CLOCK algorithm.
+    private volatile boolean mReferenced = true;
 
     private Entry(K key, V value) {
       mKey = key;

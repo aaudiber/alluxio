@@ -362,6 +362,9 @@ public final class CachingInodeStore implements InodeStore {
     }
   }
 
+  /**
+   * Cache for caching the results of listing directory children.
+   */
   private class ListingCache {
     private final int mMaxSize;
     private final int mHighWaterMark;
@@ -387,7 +390,7 @@ public final class CachingInodeStore implements InodeStore {
     public Optional<Collection<Long>> getCachedChildIds(Long inodeId) {
       ListingCacheEntry entry = mMap.get(inodeId);
       if (entry != null && entry.mChildren != null) {
-        entry.mAccessed = true;
+        entry.mReferenced = true;
         return Optional.of(entry.mChildren.values());
       }
       return Optional.empty();
@@ -398,7 +401,7 @@ public final class CachingInodeStore implements InodeStore {
         if (value == null) {
           return new ListingCacheEntry();
         }
-        value.mAccessed = true;
+        value.mReferenced = true;
         return value;
       });
       if (entry.mChildren != null) {
@@ -453,8 +456,8 @@ public final class CachingInodeStore implements InodeStore {
           break; // cache is empty.
         }
         Entry<Long, ListingCacheEntry> candidate = mEvictionHead.next();
-        if (candidate.getValue().mAccessed) {
-          candidate.getValue().mAccessed = false;
+        if (candidate.getValue().mReferenced) {
+          candidate.getValue().mReferenced = false;
         }
         mMap.compute(candidate.getKey(), (key, value) -> {
           if (value != null && value.mChildren != null) {
@@ -470,7 +473,7 @@ public final class CachingInodeStore implements InodeStore {
 
     private class ListingCacheEntry {
       private boolean mModified = false;
-      private boolean mAccessed = false;
+      private boolean mReferenced = false;
       private AtomicBoolean mLoading = new AtomicBoolean(false);
       private ConcurrentSkipListMap<String, Long> mChildren = null;
 
