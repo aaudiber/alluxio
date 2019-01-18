@@ -177,7 +177,7 @@ public final class CachingInodeStore implements InodeStore {
   public boolean hasChildren(InodeDirectoryView inode) {
     Optional<Collection<Long>> cached = mListingCache.getCachedChildIds(inode.getId());
     if (cached.isPresent()) {
-      return cached.get().isEmpty();
+      return !cached.get().isEmpty();
     }
     return !mEdgeCache.getChildIds(inode.getId()).isEmpty() || mBackingStore.hasChildren(inode);
   }
@@ -414,6 +414,14 @@ public final class CachingInodeStore implements InodeStore {
       return mEdgeCache.getChildIds(inodeId).values();
     }
 
+    public void addEmptyDirectory(long id) {
+      mMap.computeIfAbsent(id, x -> {
+        ListingCacheEntry entry = new ListingCacheEntry();
+        entry.mChildren = new ConcurrentSkipListMap<>();
+        return entry;
+      });
+    }
+
     private SortedMap<String, Long> load(Long inodeId, ListingCacheEntry entry) {
       synchronized (entry) {
         if (entry.mChildren != null) {
@@ -456,16 +464,8 @@ public final class CachingInodeStore implements InodeStore {
           return value;
         });
       }
-      LOG.debug("Evicted weight={} from listing cache down to weight={} in {}ms", toEvict,
+      LOG.info("Evicted weight={} from listing cache down to weight={} in {}ms", toEvict,
           mMap.size(), System.currentTimeMillis() - startTime);
-    }
-
-    public void addEmptyDirectory(long id) {
-      mMap.computeIfAbsent(id, x -> {
-        ListingCacheEntry entry = new ListingCacheEntry();
-        entry.mChildren = new ConcurrentSkipListMap<>();
-        return entry;
-      });
     }
 
     private class ListingCacheEntry {

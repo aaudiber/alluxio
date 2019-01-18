@@ -36,6 +36,7 @@ public abstract class Cache<K, V> {
   private final int mMaxSize;
   private final int mHighWaterMark;
   private final int mLowWaterMark;
+  private final String mName;
 
   private final EvictionThread mEvictionThread;
 
@@ -43,7 +44,8 @@ public abstract class Cache<K, V> {
     mMaxSize = maxSize;
     mHighWaterMark = highWaterMark;
     mLowWaterMark = lowWaterMark;
-    MetricsSystem.registerGaugeIfAbsent(MetricsSystem.getMetricName(name + "-size"),
+    mName = name;
+    MetricsSystem.registerGaugeIfAbsent(MetricsSystem.getMetricName(mName + "-size"),
         () -> mMap.size());
     mEvictionThread = new EvictionThread();
     mEvictionThread.setDaemon(true);
@@ -155,18 +157,17 @@ public abstract class Cache<K, V> {
         while (mMap.size() <= mLowWaterMark) {
           synchronized (mEvictionThread) { // Same as synchronized (this)
             if (mMap.size() <= mLowWaterMark) {
-              LOG.debug("Evicted {} entries in {}ms", evictionCount,
+              LOG.info("{}: Evicted {} entries in {}ms", mName, evictionCount,
                   System.currentTimeMillis() - evictionStart);
+              evictionCount = 0;
               try {
                 mEvictionThread.mIsSleeping = true;
                 mEvictionThread.wait();
                 mEvictionThread.mIsSleeping = false;
+                evictionStart = System.currentTimeMillis();
               } catch (InterruptedException e) {
                 return;
               }
-            } else {
-              evictionStart = System.currentTimeMillis();
-              evictionCount = 0;
             }
           }
         }

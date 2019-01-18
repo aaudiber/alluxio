@@ -14,6 +14,7 @@ package alluxio.master;
 import static org.mockito.Mockito.mock;
 
 import alluxio.Configuration;
+import alluxio.PropertyKey;
 import alluxio.conf.InstancedConfiguration;
 import alluxio.master.journal.JournalSystem;
 import alluxio.master.journal.noop.NoopJournalSystem;
@@ -39,7 +40,9 @@ public final class MasterTestUtils {
    * @param journalSystem a journal system to use in the context
    */
   public static CoreMasterContext testMasterContext(JournalSystem journalSystem) {
-    InstancedConfiguration conf = Configuration.global();
+    InstancedConfiguration conf = InstancedConfiguration.newBuilder()
+        .setProperty(PropertyKey.MASTER_METASTORE_INODE_CACHE_MAX_SIZE, "10")
+        .build();
     return CoreMasterContext.newBuilder()
         .setJournalSystem(journalSystem)
         .setSafeModeManager(new TestSafeModeManager())

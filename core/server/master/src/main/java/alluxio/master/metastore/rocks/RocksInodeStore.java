@@ -51,7 +51,7 @@ import java.util.Optional;
  * File store backed by RocksDB.
  */
 public class RocksInodeStore implements InodeStore {
-  private static final Logger LOG = LoggerFactory.getLogger(RocksBlockStore.class);
+  private static final Logger LOG = LoggerFactory.getLogger(RocksInodeStore.class);
   private static final String INODES_DB_NAME = "inodes";
   private static final String INODES_COLUMN = "inodes";
   private static final String EDGES_COLUMN = "edges";
