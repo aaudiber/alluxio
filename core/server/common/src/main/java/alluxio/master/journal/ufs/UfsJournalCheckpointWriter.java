@@ -12,6 +12,7 @@
 package alluxio.master.journal.ufs;
 
 import alluxio.exception.ExceptionMessage;
+import alluxio.master.journal.CheckpointWriter;
 import alluxio.proto.journal.Journal.JournalEntry;
 import alluxio.underfs.UnderFileSystem;
 
@@ -63,7 +64,7 @@ final class UfsJournalCheckpointWriter {
    * @param snapshotSequenceNumber the next sequence number from what this snapshot will represent;
    *        for example, if the snapshot is to be made from entries 1-999, this should be 1000
    */
-  UfsJournalCheckpointWriter(UfsJournal journal, long snapshotSequenceNumber)
+  UfsJournalCheckpointWriter(UfsJournal journal, long snapshotSequenceNumber, CheckpointWriter writer)
       throws IOException {
     mJournal = Preconditions.checkNotNull(journal, "journal");
     mUfs = mJournal.getUfs();

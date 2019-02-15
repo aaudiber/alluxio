@@ -18,8 +18,10 @@ import alluxio.master.file.meta.EdgeEntry;
 import alluxio.master.file.meta.Inode;
 import alluxio.master.file.meta.InodeDirectoryView;
 import alluxio.master.file.meta.MutableInode;
+import alluxio.master.journal.JournalEntryCheckpointWriter;
 import alluxio.master.metastore.InodeStore;
 
+import java.io.IOException;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
@@ -115,6 +117,13 @@ public class HeapInodeStore implements InodeStore {
   @Override
   public Set<MutableInode<?>> allInodes() {
     return new HashSet<>(mInodes.values());
+  }
+
+  @Override
+  public void writeCheckpoint(JournalEntryCheckpointWriter writer) throws IOException {
+    for (MutableInode<?> inode : mInodes.values()) {
+      writer.write(inode.toJournalEntry());
+    }
   }
 
   @Override

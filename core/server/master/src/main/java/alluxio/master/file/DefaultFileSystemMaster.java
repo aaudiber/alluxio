@@ -59,6 +59,7 @@ import alluxio.heartbeat.HeartbeatContext;
 import alluxio.heartbeat.HeartbeatThread;
 import alluxio.master.CoreMaster;
 import alluxio.master.CoreMasterContext;
+import alluxio.master.journal.Journaled;
 import alluxio.master.ProtobufUtils;
 import alluxio.master.audit.AsyncUserAccessAuditLogWriter;
 import alluxio.master.audit.AuditContext;
@@ -98,6 +99,7 @@ import alluxio.master.file.meta.UfsBlockLocationCache;
 import alluxio.master.file.meta.UfsSyncPathCache;
 import alluxio.master.file.meta.UfsSyncUtils;
 import alluxio.master.file.meta.options.MountInfo;
+import alluxio.master.journal.CheckpointWriter;
 import alluxio.master.journal.JournalContext;
 import alluxio.master.metastore.DelegatingReadOnlyInodeStore;
 import alluxio.master.metastore.InodeStore;
@@ -168,7 +170,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Iterators;
 import com.google.common.collect.Sets;
 import io.grpc.ServerInterceptors;
 import org.apache.commons.lang.StringUtils;
@@ -184,7 +185,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -483,16 +483,24 @@ public final class DefaultFileSystemMaster extends CoreMaster implements FileSys
   }
 
   @Override
-  public Iterator<JournalEntry> getJournalEntryIterator() {
-    return Iterators.concat(mInodeTree.getJournalEntryIterator(),
-        mDirectoryIdGenerator.getJournalEntryIterator(),
-        // The mount table should be written to the checkpoint after the inodes are written, so that
-        // when replaying the checkpoint, the inodes exist before mount entries. Replaying a mount
-        // entry traverses the inode tree.
-        mMountTable.getJournalEntryIterator(),
-        mUfsManager.getJournalEntryIterator(),
-        mSyncManager.getJournalEntryIterator()
-    );
+  public List<Journaled> getJournaled() {
+    return Arrays.asList(
+        mInodeTree.getState();
+        mMountTable.getJournaledState());
+//    return Iterators.concat(mInodeTree.getJournalEntryIterator(),
+//        mDirectoryIdGenerator.getJournalEntryIterator(),
+//        // The mount table should be written to the checkpoint after the inodes are written, so that
+//        // when replaying the checkpoint, the inodes exist before mount entries. Replaying a mount
+//        // entry traverses the inode tree.
+//        mMountTable.getJournalEntryIterator(),
+//        mUfsManager.getJournalEntryIterator(),
+//        mSyncManager.getJournalEntryIterator()
+//    );
+  }
+
+  @Override
+  public void writeCheckpoint(CheckpointWriter writer) {
+    mInodeStore.writeCheckpoint(writer);
   }
 
   @Override

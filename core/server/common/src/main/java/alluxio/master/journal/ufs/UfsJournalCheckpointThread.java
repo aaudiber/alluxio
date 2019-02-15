@@ -221,19 +221,20 @@ public final class UfsJournalCheckpointThread extends Thread {
 
   private void writeCheckpoint(long nextSequenceNumber) {
     LOG.info("{}: Writing checkpoint [sequence number {}].", mMaster.getName(), nextSequenceNumber);
-
-    Iterator<JournalEntry> it = mMaster.getJournalEntryIterator();
     UfsJournalCheckpointWriter journalWriter = null;
-    IOException exception = null;
     try {
       journalWriter = mJournal.getCheckpointWriter(nextSequenceNumber);
-      while (it.hasNext() && !mShutdownInitiated) {
-        journalWriter.write(it.next());
-      }
     } catch (IOException e) {
       LOG.warn("{}: Failed to checkpoint with error {}.", mMaster.getName(), e.getMessage());
       exception = e;
     }
+    master.writeCheckpoint(journalWriter);
+
+
+    Iterator<JournalEntry> it = mMaster.getJournalEntryIterator();
+
+    IOException exception = null;
+
 
     if (journalWriter != null) {
       try {

@@ -19,6 +19,8 @@ import alluxio.master.file.meta.MutableInode;
 import com.google.common.annotations.VisibleForTesting;
 
 import java.io.Closeable;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Optional;
@@ -161,6 +163,8 @@ public interface ReadOnlyInodeStore extends Closeable {
    */
   @VisibleForTesting
   Set<MutableInode<?>> allInodes();
+
+  void writeCheckpoint(OutputStream output) throws IOException;
 
   @Override
   default void close() {

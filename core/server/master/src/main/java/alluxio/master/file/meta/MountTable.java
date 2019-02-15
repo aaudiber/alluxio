@@ -18,36 +18,39 @@ import alluxio.exception.FileAlreadyExistsException;
 import alluxio.exception.InvalidPathException;
 import alluxio.exception.status.NotFoundException;
 import alluxio.exception.status.UnavailableException;
+import alluxio.grpc.GrpcUtils;
 import alluxio.grpc.MountPOptions;
+import alluxio.master.journal.Journaled;
 import alluxio.master.file.meta.options.MountInfo;
 import alluxio.master.journal.JournalContext;
-import alluxio.master.journal.JournalEntryIterable;
-import alluxio.master.journal.JournalEntryReplayable;
+import alluxio.master.journal.JournalEntryCheckpointReader;
+import alluxio.master.journal.JournalEntryCheckpointWriter;
 import alluxio.proto.journal.File;
 import alluxio.proto.journal.File.AddMountPointEntry;
 import alluxio.proto.journal.File.DeleteMountPointEntry;
 import alluxio.proto.journal.File.StringPairEntry;
-import alluxio.proto.journal.Journal;
 import alluxio.proto.journal.Journal.JournalEntry;
 import alluxio.resource.CloseableResource;
 import alluxio.resource.LockResource;
 import alluxio.underfs.UfsManager;
 import alluxio.underfs.UnderFileSystem;
 import alluxio.util.IdUtils;
-import alluxio.grpc.GrpcUtils;
 import alluxio.util.io.PathUtils;
 
 import com.google.common.base.Throwables;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
+import java.util.Map.Entry;
+import java.util.Optional;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Supplier;
@@ -61,7 +64,7 @@ import javax.annotation.concurrent.ThreadSafe;
  * This class is used for keeping track of Alluxio mount points.
  */
 @ThreadSafe
-public final class MountTable implements JournalEntryIterable, JournalEntryReplayable {
+public final class MountTable {
   private static final Logger LOG = LoggerFactory.getLogger(MountTable.class);
 
   public static final String ROOT = "/";
@@ -88,64 +91,6 @@ public final class MountTable implements JournalEntryIterable, JournalEntryRepla
     mReadLock = lock.readLock();
     mWriteLock = lock.writeLock();
     mUfsManager = ufsManager;
-  }
-
-  @Override
-  public Iterator<Journal.JournalEntry> getJournalEntryIterator() {
-    final Iterator<Map.Entry<String, MountInfo>> it = mState.getMountTable().entrySet().iterator();
-    return new Iterator<Journal.JournalEntry>() {
-      /** mEntry is always set to the next non-root mount point if exists. */
-      private Map.Entry<String, MountInfo> mEntry = null;
-
-      @Override
-      public boolean hasNext() {
-        if (mEntry != null) {
-          return true;
-        }
-        if (it.hasNext()) {
-          mEntry = it.next();
-          // Skip the root mount point, which is considered a part of initial state, not journaled
-          // state.
-          if (mEntry.getKey().equals(ROOT)) {
-            mEntry = null;
-            return hasNext();
-          }
-          return true;
-        }
-        return false;
-      }
-
-      @Override
-      public Journal.JournalEntry next() {
-        if (!hasNext()) {
-          throw new NoSuchElementException();
-        }
-        String alluxioPath = mEntry.getKey();
-        MountInfo info = mEntry.getValue();
-        mEntry = null;
-
-        Map<String, String> properties = info.getOptions().getProperties();
-        List<File.StringPairEntry> protoProperties = new ArrayList<>(properties.size());
-        for (Map.Entry<String, String> property : properties.entrySet()) {
-          protoProperties.add(File.StringPairEntry.newBuilder()
-              .setKey(property.getKey())
-              .setValue(property.getValue())
-              .build());
-        }
-
-        AddMountPointEntry addMountPoint =
-            AddMountPointEntry.newBuilder().setAlluxioPath(alluxioPath)
-                .setMountId(info.getMountId()).setUfsPath(info.getUfsUri().toString())
-                .setReadOnly(info.getOptions().getReadOnly()).addAllProperties(protoProperties)
-                .setShared(info.getOptions().getShared()).build();
-        return Journal.JournalEntry.newBuilder().setAddMountPoint(addMountPoint).build();
-      }
-
-      @Override
-      public void remove() {
-        throw new UnsupportedOperationException("Mountable#Iterator#remove is not supported.");
-      }
-    };
   }
 
   /**
@@ -201,16 +146,6 @@ public final class MountTable implements JournalEntryIterable, JournalEntryRepla
           .setShared(options.getShared())
           .setUfsPath(ufsUri.toString())
           .build());
-    }
-  }
-
-  /**
-   * Clears all the mount points except the root.
-   */
-  public void reset() {
-    LOG.info("Clearing mount table (except the root).");
-    try (LockResource r = new LockResource(mWriteLock)) {
-      mState.reset();
     }
   }
 
@@ -444,9 +379,11 @@ public final class MountTable implements JournalEntryIterable, JournalEntryRepla
     return null;
   }
 
-  @Override
-  public boolean replayJournalEntryFromJournal(JournalEntry entry) {
-    return mState.replayJournalEntryFromJournal(entry);
+  /**
+   * @return the journaled state for the mount table
+   */
+  public State getJournaledState() {
+    return mState;
   }
 
   /**
@@ -500,9 +437,22 @@ public final class MountTable implements JournalEntryIterable, JournalEntryRepla
    * journal replay. To modify the mount table, create a journal entry and call one of the
    * applyAndJournal methods.
    */
-  public static final class State implements JournalEntryReplayable {
-    /** Maps from Alluxio path string, to {@link MountInfo}. */
+  public static final class State extends Journaled {
+    private static final String NAME = "MountTable";
+
+    /**
+     * Map from Alluxio path string to mount info.
+     */
     private final Map<String, MountInfo> mMountTable;
+
+    /**
+     * @param mountInfo root mount info
+     */
+    public State(MountInfo mountInfo) {
+      super(NAME);
+      mMountTable = new HashMap<>(10);
+      mMountTable.put(MountTable.ROOT, mountInfo);
+    }
 
     /**
      * @return an unmodifiable view of the mount table
@@ -512,58 +462,85 @@ public final class MountTable implements JournalEntryIterable, JournalEntryRepla
     }
 
     /**
-     * @param mountInfo root mount info
+     * @param context journal context
+     * @param entry   add mount point entry
      */
-    public State(MountInfo mountInfo) {
-      mMountTable = new HashMap<>(10);
-      mMountTable.put(MountTable.ROOT, mountInfo);
+    public void applyAndJournal(Supplier<JournalContext> context, AddMountPointEntry entry) {
+      applyAndJournal(context, JournalEntry.newBuilder().setAddMountPoint(entry).build());
+    }
+
+    /**
+     * @param context journal context
+     * @param entry   delete mount point entry
+     */
+    public void applyAndJournal(Supplier<JournalContext> context, DeleteMountPointEntry entry) {
+      applyAndJournal(context, JournalEntry.newBuilder().setDeleteMountPoint(entry).build());
     }
 
     @Override
-    public boolean replayJournalEntryFromJournal(JournalEntry entry) {
-      if (entry.hasAddMountPoint()) {
-        apply(entry.getAddMountPoint());
-      } else if (entry.hasDeleteMountPoint()) {
-        apply(entry.getDeleteMountPoint());
-      } else {
-        return false;
+    public void toCheckpoint(OutputStream output) throws IOException {
+      JournalEntryCheckpointWriter writer = new JournalEntryCheckpointWriter(output);
+      for (Entry<String, MountInfo> entry : mMountTable.entrySet()) {
+        String path = entry.getKey();
+        MountInfo mountInfo = entry.getValue();
+        if (path.equals(ROOT)) {
+          // Skip the root mount point, which is considered a part of initial state, not journaled
+          // state.
+          continue;
+        }
+        Map<String, String> properties = mountInfo.getOptions().getProperties();
+        List<File.StringPairEntry> protoProperties = new ArrayList<>(properties.size());
+        for (Map.Entry<String, String> property : properties.entrySet()) {
+          protoProperties.add(File.StringPairEntry.newBuilder()
+              .setKey(property.getKey())
+              .setValue(property.getValue())
+              .build());
+        }
+
+        AddMountPointEntry addMountPoint =
+            AddMountPointEntry.newBuilder().setAlluxioPath(path)
+                .setMountId(mountInfo.getMountId()).setUfsPath(mountInfo.getUfsUri().toString())
+                .setReadOnly(mountInfo.getOptions().getReadOnly()).addAllProperties(protoProperties)
+                .setShared(mountInfo.getOptions().getShared()).build();
+        writer.write(JournalEntry.newBuilder().setAddMountPoint(addMountPoint).build());
       }
-      return true;
+      writer.close();
     }
 
-    /**
-     * @param context journal context
-     * @param entry add mount point entry
-     */
-    public void applyAndJournal(Supplier<JournalContext> context, AddMountPointEntry entry) {
-      apply(entry);
-      context.get().append(JournalEntry.newBuilder().setAddMountPoint(entry).build());
+    @Override
+    public void restoreFromCheckpoint(InputStream input) throws IOException {
+      reset();
+      JournalEntryCheckpointReader reader = new JournalEntryCheckpointReader(input);
+      Optional<JournalEntry> entry;
+      while ((entry = reader.read()).isPresent()) {
+        apply(entry.get());
+      }
+      reader.close();
     }
 
-    /**
-     * @param context journal context
-     * @param entry delete mount point entry
-     */
-    public void applyAndJournal(Supplier<JournalContext> context, DeleteMountPointEntry entry) {
-      apply(entry);
-      context.get().append(JournalEntry.newBuilder().setDeleteMountPoint(entry).build());
+    @Override
+    protected void apply(JournalEntry entry) {
+      if (entry.hasAddMountPoint()) {
+        applyAddMountPoint(entry.getAddMountPoint());
+      } else if (entry.hasDeleteMountPoint()) {
+        applyDeleteMountPoint(entry.getDeleteMountPoint());
+      } else {
+        throw new RuntimeException("Unrecognized journal entry: " + entry);
+      }
     }
 
-    private void apply(AddMountPointEntry entry) {
+    private void applyAddMountPoint(AddMountPointEntry entry) {
       MountInfo mountInfo =
           new MountInfo(new AlluxioURI(entry.getAlluxioPath()), new AlluxioURI(entry.getUfsPath()),
               entry.getMountId(), GrpcUtils.fromMountEntry(entry));
       mMountTable.put(entry.getAlluxioPath(), mountInfo);
     }
 
-    private void apply(DeleteMountPointEntry entry) {
+    private void applyDeleteMountPoint(DeleteMountPointEntry entry) {
       mMountTable.remove(entry.getAlluxioPath());
     }
 
-    /**
-     * Resets the mount table state.
-     */
-    public void reset() {
+    private void reset() {
       MountInfo mountInfo = mMountTable.get(ROOT);
       mMountTable.clear();
       if (mountInfo != null) {

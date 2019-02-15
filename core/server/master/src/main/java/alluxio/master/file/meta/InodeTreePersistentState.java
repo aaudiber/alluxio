@@ -13,8 +13,8 @@ package alluxio.master.file.meta;
 
 import alluxio.ProcessUtils;
 import alluxio.collections.ConcurrentHashSet;
+import alluxio.master.journal.Journaled;
 import alluxio.master.journal.JournalContext;
-import alluxio.master.journal.JournalEntryReplayable;
 import alluxio.master.metastore.InodeStore;
 import alluxio.proto.journal.File.AsyncPersistRequestEntry;
 import alluxio.proto.journal.File.CompleteFileEntry;
@@ -42,6 +42,9 @@ import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayDeque;
@@ -58,8 +61,9 @@ import java.util.function.Supplier;
  * this class. To modify the inode tree, create a journal entry and call one of the applyAndJournal
  * methods.
  */
-public class InodeTreePersistentState implements JournalEntryReplayable {
+public class InodeTreePersistentState extends Journaled {
   private static final Logger LOG = LoggerFactory.getLogger(InodeTreePersistentState.class);
+  private static final String NAME = "InodeTree";
 
   private final InodeStore mInodeStore;
   private final InodeLockManager mInodeLockManager;
@@ -76,13 +80,6 @@ public class InodeTreePersistentState implements JournalEntryReplayable {
   private final Set<Long> mReplicationLimitedFileIds = new ConcurrentHashSet<>(64, 0.90f, 64);
 
   /**
-   * @return an unmodifiable view of the replication limited file ids
-   */
-  public Set<Long> getReplicationLimitedFileIds() {
-    return Collections.unmodifiableSet(mReplicationLimitedFileIds);
-  }
-
-  /**
    * TTL bucket list. The list is owned by InodeTree, and is only shared with
    * InodeTreePersistentState so that the list can be updated whenever inode tree state changes.
    */
@@ -97,9 +94,18 @@ public class InodeTreePersistentState implements JournalEntryReplayable {
    */
   public InodeTreePersistentState(InodeStore inodeStore, InodeLockManager lockManager,
       TtlBucketList ttlBucketList) {
+    super(NAME);
+
     mInodeStore = inodeStore;
     mInodeLockManager = lockManager;
     mTtlBuckets = ttlBucketList;
+  }
+
+  /**
+   * @return an unmodifiable view of the replication limited file ids
+   */
+  public Set<Long> getReplicationLimitedFileIds() {
+    return Collections.unmodifiableSet(mReplicationLimitedFileIds);
   }
 
   /**
@@ -116,48 +122,6 @@ public class InodeTreePersistentState implements JournalEntryReplayable {
     return Collections.unmodifiableSet(mPinnedInodeFileIds);
   }
 
-  /**
-   * Applies a journal entry to the inode tree state. This method should only be used during journal
-   * replay. Otherwise, use one of the applyAndJournal methods.
-   *
-   * @param entry the entry
-   * @return whether the journal entry was of a type recognized by the inode tree
-   */
-  public boolean replayJournalEntryFromJournal(JournalEntry entry) {
-    if (entry.hasDeleteFile()) {
-      applyDelete(entry.getDeleteFile());
-    } else if (entry.hasInodeDirectory()) {
-      applyCreateDirectory(entry.getInodeDirectory());
-    } else if (entry.hasInodeFile()) {
-      applyCreateFile(entry.getInodeFile());
-    } else if (entry.hasNewBlock()) {
-      applyNewBlock(entry.getNewBlock());
-    } else if (entry.hasRename()) {
-      applyRename(entry.getRename());
-    } else if (entry.hasSetAcl()) {
-      applySetAcl(entry.getSetAcl());
-    } else if (entry.hasUpdateInode()) {
-      applyUpdateInode(entry.getUpdateInode());
-    } else if (entry.hasUpdateInodeDirectory()) {
-      applyUpdateInodeDirectory(entry.getUpdateInodeDirectory());
-    } else if (entry.hasUpdateInodeFile()) {
-      applyUpdateInodeFile(entry.getUpdateInodeFile());
-      // Deprecated entries
-    } else if (entry.hasAsyncPersistRequest()) {
-      applyAsyncPersist(entry.getAsyncPersistRequest());
-    } else if (entry.hasCompleteFile()) {
-      applyCompleteFile(entry.getCompleteFile());
-    } else if (entry.hasInodeLastModificationTime()) {
-      applyInodeLastModificationTime(entry.getInodeLastModificationTime());
-    } else if (entry.hasPersistDirectory()) {
-      applyPersistDirectory(entry.getPersistDirectory());
-    } else if (entry.hasSetAttribute()) {
-      applySetAttribute(entry.getSetAttribute());
-    } else {
-      return false;
-    }
-    return true;
-  }
 
   /**
    * Deletes an inode (may be either a file or directory).
@@ -623,5 +587,53 @@ public class InodeTreePersistentState implements JournalEntryReplayable {
     mInodeStore.clear();
     mReplicationLimitedFileIds.clear();
     mPinnedInodeFileIds.clear();
+  }
+
+  @Override
+  public void toCheckpoint(OutputStream output) throws IOException {
+    mInodeStore.writeCheckpoint(output);
+  }
+
+  @Override
+  public void restoreFromCheckpoint(InputStream input) throws IOException {
+    reset();
+    mReplicationLimitedFileIds
+    mInodeStore.restoreFromCheckpoint(input);
+  }
+
+  @Override
+  protected void apply(JournalEntry entry) {
+    if (entry.hasDeleteFile()) {
+      applyDelete(entry.getDeleteFile());
+    } else if (entry.hasInodeDirectory()) {
+      applyCreateDirectory(entry.getInodeDirectory());
+    } else if (entry.hasInodeFile()) {
+      applyCreateFile(entry.getInodeFile());
+    } else if (entry.hasNewBlock()) {
+      applyNewBlock(entry.getNewBlock());
+    } else if (entry.hasRename()) {
+      applyRename(entry.getRename());
+    } else if (entry.hasSetAcl()) {
+      applySetAcl(entry.getSetAcl());
+    } else if (entry.hasUpdateInode()) {
+      applyUpdateInode(entry.getUpdateInode());
+    } else if (entry.hasUpdateInodeDirectory()) {
+      applyUpdateInodeDirectory(entry.getUpdateInodeDirectory());
+    } else if (entry.hasUpdateInodeFile()) {
+      applyUpdateInodeFile(entry.getUpdateInodeFile());
+      // Deprecated entries
+    } else if (entry.hasAsyncPersistRequest()) {
+      applyAsyncPersist(entry.getAsyncPersistRequest());
+    } else if (entry.hasCompleteFile()) {
+      applyCompleteFile(entry.getCompleteFile());
+    } else if (entry.hasInodeLastModificationTime()) {
+      applyInodeLastModificationTime(entry.getInodeLastModificationTime());
+    } else if (entry.hasPersistDirectory()) {
+      applyPersistDirectory(entry.getPersistDirectory());
+    } else if (entry.hasSetAttribute()) {
+      applySetAttribute(entry.getSetAttribute());
+    } else {
+      throw new RuntimeException("Unrecognized journal entry: " + entry);
+    }
   }
 }
