@@ -11,15 +11,13 @@
 
 package alluxio.master.journal.ufs;
 
-import alluxio.exception.ExceptionMessage;
-import alluxio.master.journal.CheckpointWriter;
-import alluxio.proto.journal.Journal.JournalEntry;
 import alluxio.underfs.UnderFileSystem;
 
 import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
@@ -35,7 +33,7 @@ import javax.annotation.concurrent.NotThreadSafe;
  * checkpoint has already been created by another secondary master, the checkpoint is aborted.
  */
 @NotThreadSafe
-final class UfsJournalCheckpointWriter {
+final class UfsJournalCheckpointWriter extends FilterOutputStream {
   private static final Logger LOG = LoggerFactory.getLogger(UfsJournalCheckpointWriter.class);
 
   private final UfsJournal mJournal;
@@ -45,14 +43,6 @@ final class UfsJournalCheckpointWriter {
   private final UfsJournalFile mCheckpointFile;
   /** The location for the temporary checkpoint. */
   private final URI mTmpCheckpointFileLocation;
-  /** The output stream to the temporary checkpoint file. */
-  private final OutputStream mTmpCheckpointStream;
-
-  /**
-   * The sequence number for the next journal entry to be written to the checkpoint. Note that this
-   * always starts with 0 and is not necessarily the same as the sequence number in edit logs.
-   */
-  private long mNextSequenceNumber;
 
   /** Whether this journal writer is closed. */
   private boolean mClosed;
@@ -64,34 +54,21 @@ final class UfsJournalCheckpointWriter {
    * @param snapshotSequenceNumber the next sequence number from what this snapshot will represent;
    *        for example, if the snapshot is to be made from entries 1-999, this should be 1000
    */
-  UfsJournalCheckpointWriter(UfsJournal journal, long snapshotSequenceNumber, CheckpointWriter writer)
+  UfsJournalCheckpointWriter(UfsJournal journal, long snapshotSequenceNumber)
       throws IOException {
+    super(createTmpOutputStream(journal));
     mJournal = Preconditions.checkNotNull(journal, "journal");
     mUfs = mJournal.getUfs();
-    mNextSequenceNumber = 0;
 
     mTmpCheckpointFileLocation = UfsJournalFile.encodeTemporaryCheckpointFileLocation(mJournal);
-    mTmpCheckpointStream = mUfs.create(mTmpCheckpointFileLocation.toString());
     mCheckpointFile = UfsJournalFile.createCheckpointFile(
         UfsJournalFile.encodeCheckpointFileLocation(mJournal, snapshotSequenceNumber),
         snapshotSequenceNumber);
   }
 
-  public void write(JournalEntry entry) throws IOException {
-    if (mClosed) {
-      throw new IOException(ExceptionMessage.JOURNAL_WRITE_AFTER_CLOSE.getMessage());
-    }
-    try {
-      entry.toBuilder().setSequenceNumber(mNextSequenceNumber).build()
-          .writeDelimitedTo(mTmpCheckpointStream);
-    } catch (IOException e) {
-      throw e;
-    }
-    mNextSequenceNumber++;
-  }
-
-  public void flush() throws IOException {
-    mTmpCheckpointStream.flush();
+  private static OutputStream createTmpOutputStream(UfsJournal journal) throws IOException {
+    URI path = UfsJournalFile.encodeTemporaryCheckpointFileLocation(journal);
+    return journal.getUfs().create(path.toString());
   }
 
   public void close() throws IOException {
@@ -99,7 +76,7 @@ final class UfsJournalCheckpointWriter {
       return;
     }
     mClosed = true;
-    mTmpCheckpointStream.close();
+    super.close();
 
     // Delete the temporary checkpoint if there is a newer checkpoint committed.
     UfsJournalFile latestCheckpoint =
@@ -146,7 +123,7 @@ final class UfsJournalCheckpointWriter {
     }
     mClosed = true;
 
-    mTmpCheckpointStream.close();
+    out.close();
     if (mUfs.exists(mTmpCheckpointFileLocation.toString())) {
       mUfs.deleteFile(mTmpCheckpointFileLocation.toString());
     }

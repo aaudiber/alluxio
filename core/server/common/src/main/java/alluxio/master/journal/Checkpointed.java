@@ -16,37 +16,26 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 /**
- * Base class for classes which have their state checkpointed.
+ * Base class for Alluxio classes with journaled state.
  */
-public abstract class Checkpointed {
-  private final String mName;
-
+public interface Checkpointed {
   /**
-   * @param name a name for this checkpointed class. The name is used in checkpoints, so it must not
-   *        change
+   * @return a name for this checkpointed class. The name is used in checkpoints, so it must not
+   *         change
    */
-  public Checkpointed(String name) {
-    mName = name;
-  }
-
-  /**
-   * @return the name for this checkpointed class
-   */
-  public final String getName() {
-    return mName;
-  }
+  String getName();
 
   /**
    * Writes a checkpoint of all state to the given output stream
    *
    * @param output the output stream to write to
    */
-  public abstract void toCheckpoint(OutputStream output) throws IOException;
+  void writeToCheckpoint(OutputStream output) throws IOException, InterruptedException;
 
   /**
    * Restores state from a checkpoint.
    *
    * @param input an input stream with checkpoint data
    */
-  public abstract void restoreFromCheckpoint(InputStream input) throws IOException;
+  void restoreFromCheckpoint(InputStream input) throws IOException;
 }

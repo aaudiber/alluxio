@@ -11,8 +11,6 @@
 
 package alluxio.master.journal;
 
-import alluxio.proto.journal.Journal.JournalEntry;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -21,14 +19,14 @@ import java.util.function.Supplier;
 /**
  * Base class for Alluxio classes with journaled state.
  */
-public abstract class Journaled {
+public class AbstractJournaled implements Checkpointed {
   private final String mName;
 
   /**
    * @param name a name for this journaled class. The name is used in checkpoints, so it must not
    *        change
    */
-  public Journaled(String name) {
+  public AbstractJournaled(String name) {
     mName = name;
   }
 

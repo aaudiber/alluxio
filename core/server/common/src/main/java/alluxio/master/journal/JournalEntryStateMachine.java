@@ -18,7 +18,7 @@ import java.io.IOException;
 /**
  * Interface for a state machine which operates on {@link JournalEntry}s.
  */
-public interface JournalEntryStateMachine extends JournalEntryIterable {
+public interface JournalEntryStateMachine extends Checkpointed {
   /**
    * @return the name of this journal entry state machine
    */
