@@ -14,9 +14,10 @@ package alluxio.master.journal.raft;
 import alluxio.ProcessUtils;
 import alluxio.master.journal.JournalEntryAssociation;
 import alluxio.master.journal.JournalEntryStateMachine;
-import alluxio.master.journal.JournalEntryStreamReader;
 import alluxio.proto.journal.Journal.JournalEntry;
 
+import com.esotericsoftware.kryo.io.InputChunked;
+import com.esotericsoftware.kryo.io.OutputChunked;
 import com.google.common.base.Preconditions;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.atomix.copycat.server.Commit;
@@ -29,10 +30,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.io.OutputStream;
+import java.io.InputStream;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import javax.annotation.concurrent.GuardedBy;
 
@@ -177,6 +178,7 @@ public class JournalStateMachine extends StateMachine implements Snapshottable {
 
   @Override
   public synchronized void snapshot(SnapshotWriter writer) {
+    // Snapshot format is [snapshotId, name1, bytes1, name2, bytes2, ...].
     if (mClosed) {
       return;
     }
@@ -184,36 +186,20 @@ public class JournalStateMachine extends StateMachine implements Snapshottable {
     Preconditions.checkState(!mSnapshotting, "Cannot call snapshot multiple times concurrently");
     mSnapshotting = true;
     long start = System.currentTimeMillis();
-    long snapshotSN = mNextSequenceNumberToRead - 1;
-    try {
-      for (RaftJournal journal : mJournals.values()) {
-        for (Iterator<JournalEntry> it = journal.getStateMachine().getJournalEntryIterator(); it
-            .hasNext();) {
-          // All entries in a snapshot use the sequence number of the last entry included in the
-          // snapshot
-          JournalEntry entry = it.next().toBuilder().setSequenceNumber(snapshotSN).build();
+    long snapshotId = mNextSequenceNumberToRead - 1;
+    try (SnapshotWriterStream sws = new SnapshotWriterStream(writer);
+         OutputChunked output = new OutputChunked(sws)) {
+      output.writeLong(snapshotId);
+      for (Entry<String, RaftJournal> entry : mJournals.entrySet()) {
+        String name = entry.getKey();
+        RaftJournal journal = entry.getValue();
 
-          LOG.trace("Writing entry to snapshot: {}", entry);
-          try {
-            entry.writeDelimitedTo(new OutputStream() {
-              @Override
-              public void write(int b) throws IOException {
-                writer.writeByte(b);
-              }
+        output.writeString(name);
+        journal.getStateMachine().writeToCheckpoint(output);
 
-              @Override
-              public void write(byte[] b, int off, int len) {
-                writer.write(b, off, len);
-              }
-            });
-          } catch (IOException e) {
-            ProcessUtils.fatalError(LOG, e,
-                "Failed to take snapshot for master {}. Failed to write entry {}",
-                journal.getStateMachine().getName(), entry);
-          }
-        }
+        output.endChunks();
       }
-      LOG.info("Completed snapshot up to SN {} in {}ms", snapshotSN,
+      LOG.info("Completed snapshot up to SN {} in {}ms", snapshotId,
           System.currentTimeMillis() - start);
     } catch (Throwable t) {
       ProcessUtils.fatalError(LOG, t, "Failed to snapshot");
@@ -230,20 +216,26 @@ public class JournalStateMachine extends StateMachine implements Snapshottable {
       LOG.warn("Unexpected request to install a snapshot on a read-only journal state machine");
       return;
     }
-    resetState();
-    JournalEntryStreamReader reader =
-        new JournalEntryStreamReader(new SnapshotReaderStream(snapshotReader));
 
-    JournalEntry entry = null;
-    while (snapshotReader.hasRemaining()) {
-      try {
-        entry = reader.readEntry();
-      } catch (IOException e) {
-        ProcessUtils.fatalError(LOG, e, "Failed to install snapshot");
+    long snapshotSN;
+    try (InputStream srs = new SnapshotReaderStream(snapshotReader);
+         InputChunked input = new InputChunked(srs)) {
+      snapshotSN = input.readLong();
+      String name;
+      while ((name = input.readString()) != null) {
+        RaftJournal journal = mJournals.get(name);
+        if (journal == null) {
+          throw new RuntimeException("Unknown checkpoint: " + name);
+        }
+        journal.getStateMachine().restoreFromCheckpoint(input);
+
+        input.nextChunks();
       }
-      applyToMaster(entry);
+    } catch (IOException e) {
+      ProcessUtils.fatalError(LOG, e, "Failed to install snapshot");
+      throw new RuntimeException(e);
     }
-    long snapshotSN = entry != null ? entry.getSequenceNumber() : -1;
+
     if (snapshotSN < mNextSequenceNumberToRead - 1) {
       LOG.warn("Installed snapshot for SN {} but next SN to read is {}", snapshotSN,
           mNextSequenceNumberToRead);

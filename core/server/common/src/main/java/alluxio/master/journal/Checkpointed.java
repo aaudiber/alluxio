@@ -26,7 +26,7 @@ public interface Checkpointed {
   String getName();
 
   /**
-   * Writes a checkpoint of all state to the given output stream
+   * Writes a checkpoint of all state to the given output stream.
    *
    * @param output the output stream to write to
    */
