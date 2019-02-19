@@ -3173,12 +3173,14 @@ public final class DefaultFileSystemMaster extends CoreMaster implements FileSys
               syncMetadataInternal(rpcContext, changedFilePath, lockingScheme, DescendantType.NONE,
                   statusCache);
             } catch (InvalidPathException e) {
-              LOG.info("forceSyncMetadata processed an invalid path {}", changedFile.getPath());
+              LOG.info("forceSyncMetadata processed an invalid path {}: {}", changedFile.getPath(),
+                  e.toString());
             }
             return null;
           });
         }
         executorService.invokeAll(callables);
+        LOG.info("Ended an active incremental sync of {} files", changedFiles.size());
       }
     } catch (InvalidPathException e) {
       LOG.warn("InvalidPathException during active sync {}", e);
@@ -3187,7 +3189,6 @@ public final class DefaultFileSystemMaster extends CoreMaster implements FileSys
       Thread.currentThread().interrupt();
       return;
     }
-    LOG.info("Ended an active incremental sync of {} files", changedFiles.size());
   }
 
   @Override
