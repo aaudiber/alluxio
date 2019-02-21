@@ -33,9 +33,12 @@ import alluxio.job.meta.JobInfo;
 import alluxio.job.meta.MasterWorkerInfo;
 import alluxio.job.wire.Status;
 import alluxio.job.wire.TaskInfo;
-import alluxio.master.AbstractNonJournaledMaster;
+import alluxio.master.AbstractMaster;
 import alluxio.master.MasterContext;
 import alluxio.master.job.command.CommandManager;
+import alluxio.master.journal.NoopJournalContext;
+import alluxio.master.journal.NoopJournaled;
+import alluxio.proto.journal.Journal.JournalEntry;
 import alluxio.resource.LockResource;
 import alluxio.underfs.UfsManager;
 import alluxio.util.CommonUtils;
@@ -50,6 +53,8 @@ import org.slf4j.LoggerFactory;
 import net.jcip.annotations.GuardedBy;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -68,7 +73,7 @@ import javax.annotation.concurrent.ThreadSafe;
  * The master that handles all job managing operations.
  */
 @ThreadSafe
-public final class JobMaster extends AbstractNonJournaledMaster {
+public final class JobMaster extends AbstractMaster implements NoopJournaled {
   private static final Logger LOG = LoggerFactory.getLogger(JobMaster.class);
   private static final long RETENTION_MS =
       ServerConfiguration.getLong(PropertyKey.JOB_MASTER_FINISHED_JOB_RETENTION_MS);

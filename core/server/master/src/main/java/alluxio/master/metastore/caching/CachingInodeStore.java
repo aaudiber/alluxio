@@ -25,6 +25,7 @@ import alluxio.master.file.meta.InodeLockManager;
 import alluxio.master.file.meta.MutableInode;
 import alluxio.master.metastore.InodeStore;
 import alluxio.master.metastore.heap.HeapInodeStore;
+import alluxio.master.metastore.rocks.RocksInodeStore;
 import alluxio.metrics.MetricsSystem;
 import alluxio.resource.LockResource;
 import alluxio.util.ConfigurationUtils;
@@ -38,6 +39,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -86,6 +89,7 @@ import javax.annotation.concurrent.ThreadSafe;
 @ThreadSafe
 public final class CachingInodeStore implements InodeStore, Closeable {
   private static final Logger LOG = LoggerFactory.getLogger(CachingInodeStore.class);
+  private static final String NAME = "CachingInodeStore";
 
   private final InodeStore mBackingStore;
   private final InodeLockManager mLockManager;
@@ -233,6 +237,24 @@ public final class CachingInodeStore implements InodeStore, Closeable {
     }
   }
 
+  @Override
+  public String getName() {
+    return NAME;
+  }
+
+  @Override
+  public void writeToCheckpoint(OutputStream output) throws IOException, InterruptedException {
+    mInodeCache.flushAll();
+    mEdgeCache.flushAll();
+    mBackingStore.writeToCheckpoint(output);
+  }
+
+  @Override
+  public void restoreFromCheckpoint(InputStream input) throws IOException {
+    mBackingStore.restoreFromCheckpoint(input);
+    mBackingStoreEmpty = false;
+  }
+
   /**
    * Cache for inode metadata.
    *
@@ -273,6 +295,9 @@ public final class CachingInodeStore implements InodeStore, Closeable {
       boolean useBatch = entries.size() > 0 && mBackingStore.supportsBatchWrite();
       WriteBatch batch = useBatch ? mBackingStore.createWriteBatch() : null;
       for (Entry entry : entries) {
+        if (!entry.mDirty) {
+          continue;
+        }
         Long inodeId = entry.mKey;
         Optional<LockResource> lockOpt = mLockManager.tryLockInode(inodeId, LockMode.WRITE);
         if (!lockOpt.isPresent()) {
@@ -446,6 +471,9 @@ public final class CachingInodeStore implements InodeStore, Closeable {
       boolean useBatch = entries.size() > 0 && mBackingStore.supportsBatchWrite();
       WriteBatch batch = useBatch ? mBackingStore.createWriteBatch() : null;
       for (Entry entry : entries) {
+        if (!entry.mDirty) {
+          continue;
+        }
         Edge edge = entry.mKey;
         Optional<LockResource> lockOpt = mLockManager.tryLockEdge(edge, LockMode.WRITE);
         if (!lockOpt.isPresent()) {

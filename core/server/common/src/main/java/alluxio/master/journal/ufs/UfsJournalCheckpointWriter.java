@@ -11,14 +11,13 @@
 
 package alluxio.master.journal.ufs;
 
-import alluxio.exception.ExceptionMessage;
-import alluxio.proto.journal.Journal.JournalEntry;
 import alluxio.underfs.UnderFileSystem;
 
 import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
@@ -26,15 +25,16 @@ import java.net.URI;
 import javax.annotation.concurrent.NotThreadSafe;
 
 /**
- * Writes checkpoints to the UFS. The secondary masters use this to periodically create new
- * checkpoints.
+ * Stream for writing checkpoints to the UFS. The secondary masters use this to periodically create
+ * new checkpoints.
  *
- * It first writes checkpoint to a temporary location. After it is done with writing the temporary
- * checkpoint, commit it by renaming the temporary checkpoint to the final location. If the same
- * checkpoint has already been created by another secondary master, the checkpoint is aborted.
+ * It first writes the checkpoint to a temporary location. After it is done with writing the
+ * temporary checkpoint, it commits the checkpoint by renaming the temporary checkpoint to the final
+ * location. If the same checkpoint has already been created by another secondary master, the
+ * checkpoint is aborted.
  */
 @NotThreadSafe
-final class UfsJournalCheckpointWriter {
+final class UfsJournalCheckpointWriter extends FilterOutputStream {
   private static final Logger LOG = LoggerFactory.getLogger(UfsJournalCheckpointWriter.class);
 
   private final UfsJournal mJournal;
@@ -44,14 +44,6 @@ final class UfsJournalCheckpointWriter {
   private final UfsJournalFile mCheckpointFile;
   /** The location for the temporary checkpoint. */
   private final URI mTmpCheckpointFileLocation;
-  /** The output stream to the temporary checkpoint file. */
-  private final OutputStream mTmpCheckpointStream;
-
-  /**
-   * The sequence number for the next journal entry to be written to the checkpoint. Note that this
-   * always starts with 0 and is not necessarily the same as the sequence number in edit logs.
-   */
-  private long mNextSequenceNumber;
 
   /** Whether this journal writer is closed. */
   private boolean mClosed;
@@ -65,40 +57,28 @@ final class UfsJournalCheckpointWriter {
    */
   UfsJournalCheckpointWriter(UfsJournal journal, long snapshotSequenceNumber)
       throws IOException {
+    super(createTmpOutputStream(journal));
     mJournal = Preconditions.checkNotNull(journal, "journal");
     mUfs = mJournal.getUfs();
-    mNextSequenceNumber = 0;
 
     mTmpCheckpointFileLocation = UfsJournalFile.encodeTemporaryCheckpointFileLocation(mJournal);
-    mTmpCheckpointStream = mUfs.create(mTmpCheckpointFileLocation.toString());
     mCheckpointFile = UfsJournalFile.createCheckpointFile(
         UfsJournalFile.encodeCheckpointFileLocation(mJournal, snapshotSequenceNumber),
         snapshotSequenceNumber);
   }
 
-  public void write(JournalEntry entry) throws IOException {
-    if (mClosed) {
-      throw new IOException(ExceptionMessage.JOURNAL_WRITE_AFTER_CLOSE.getMessage());
-    }
-    try {
-      entry.toBuilder().setSequenceNumber(mNextSequenceNumber).build()
-          .writeDelimitedTo(mTmpCheckpointStream);
-    } catch (IOException e) {
-      throw e;
-    }
-    mNextSequenceNumber++;
+  private static OutputStream createTmpOutputStream(UfsJournal journal) throws IOException {
+    URI path = UfsJournalFile.encodeTemporaryCheckpointFileLocation(journal);
+    return journal.getUfs().create(path.toString());
   }
 
-  public void flush() throws IOException {
-    mTmpCheckpointStream.flush();
-  }
-
+  @Override
   public void close() throws IOException {
     if (mClosed) {
       return;
     }
     mClosed = true;
-    mTmpCheckpointStream.close();
+    out.close();
 
     // Delete the temporary checkpoint if there is a newer checkpoint committed.
     UfsJournalFile latestCheckpoint =
@@ -145,7 +125,7 @@ final class UfsJournalCheckpointWriter {
     }
     mClosed = true;
 
-    mTmpCheckpointStream.close();
+    out.close();
     if (mUfs.exists(mTmpCheckpointFileLocation.toString())) {
       mUfs.deleteFile(mTmpCheckpointFileLocation.toString());
     }

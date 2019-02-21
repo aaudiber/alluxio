@@ -11,6 +11,7 @@
 
 package alluxio.master;
 
+import alluxio.master.journal.Journaled;
 import alluxio.util.executor.ExecutorServiceFactory;
 
 import java.time.Clock;

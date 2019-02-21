@@ -13,6 +13,8 @@ package alluxio.master.metastore.caching;
 
 import alluxio.Constants;
 import alluxio.metrics.MetricsSystem;
+import alluxio.util.CommonUtils;
+import alluxio.util.WaitForOptions;
 import alluxio.util.logging.SamplingLogger;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -31,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeoutException;
 
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -185,6 +188,20 @@ public abstract class Cache<K, V> implements Closeable {
   }
 
   /**
+   * Flushes all data to the backing store.
+   */
+  public void flushAll() throws InterruptedException {
+    mEvictionThread.mFlushAll = true;
+    kickEvictionThread();
+    try {
+      CommonUtils.waitFor("eviction thread to finish", () -> !mEvictionThread.mFlushAll,
+          WaitForOptions.defaults().setTimeoutMs(Constants.DAY_MS));
+    } catch (TimeoutException e) {
+      throw new RuntimeException("Failed to flush to backing store after 24 hours");
+    }
+  }
+
+  /**
    * Clears all entries from the map. This is not threadsafe, and requires external synchronization
    * to prevent concurrent modifications to the cache.
    */
@@ -244,9 +261,9 @@ public abstract class Cache<K, V> implements Closeable {
 
     private Iterator<Entry> mEvictionHead = Collections.emptyIterator();
     private final Logger mCacheFullLogger = new SamplingLogger(LOG, 10 * Constants.SECOND_MS);
+    // Used to indicate that the eviction thread should flush all dirty entries.
+    private volatile boolean mFlushAll = false;
 
-    // This is used temporarily in each call to evictEntries. We store it as a field to avoid
-    // re-allocating the array on each eviction.
     private List<Entry> mEvictionCandidates;
 
     private EvictionThread() {
@@ -260,18 +277,34 @@ public abstract class Cache<K, V> implements Closeable {
         // Wait for the cache to get over the high water mark.
         while (!overHighWaterMark()) {
           synchronized (mEvictionThread) {
-            if (!overHighWaterMark()) {
-              try {
-                mIsSleeping = true;
-                mEvictionThread.wait();
-                mIsSleeping = false;
-              } catch (InterruptedException e) {
-                return;
-              }
+            if (overHighWaterMark() || mFlushAll) {
+              break;
+            }
+            try {
+              mIsSleeping = true;
+              mEvictionThread.wait();
+              mIsSleeping = false;
+            } catch (InterruptedException e) {
+              return;
             }
           }
         }
-        evictToLowWaterMark();
+        if (mFlushAll) {
+          flush();
+          mFlushAll = false;
+        }
+        if (overHighWaterMark()) {
+          evictToLowWaterMark();
+        }
+      }
+    }
+
+    private void flush() {
+      mEvictionCandidates.clear();
+      mEvictionHead = mMap.values().iterator();
+      while (mEvictionHead.hasNext()) {
+        fillBatch(true);
+        evictBatch();
       }
     }
 
@@ -286,7 +319,11 @@ public abstract class Cache<K, V> implements Closeable {
                   + "high water mark. size:{} lowWaterMark:{} highWaterMark:{} maxSize:{}",
               mName, mMap.size(), mLowWaterMark, mHighWaterMark, mMaxSize);
         }
-        evictionCount += evictBatch(Math.min(toEvict - evictionCount, mEvictBatchSize));
+        if (!mEvictionHead.hasNext()) {
+          mEvictionHead = mMap.values().iterator();
+        }
+        fillBatch(false);
+        evictionCount += evictBatch();
       }
       if (evictionCount > 0) {
         LOG.debug("{}: Evicted {} entries in {}ms", mName, evictionCount,
@@ -295,44 +332,58 @@ public abstract class Cache<K, V> implements Closeable {
     }
 
     /**
-     * @param batchSize the target number of entries to evict. If batchSize is less than 1, no
-     *        entries will be evicted
-     * @return the number of entries evicted
+     * Attempts to fill mEvictionCandidates with up to mEvictBatchSize candidates for eviction.
+     *
+     * @param dirtyOnly whether to only add dirty inodes
      */
-    private int evictBatch(int batchSize) {
-      int evictionCount = 0;
-      mEvictionCandidates.clear();
-      while (mEvictionCandidates.size() < batchSize) {
-        // Every iteration either sets a referenced bit from true to false or adds a new candidate.
+    private void fillBatch(boolean dirtyOnly) {
+      while (mEvictionCandidates.size() < mEvictBatchSize) {
         if (!mEvictionHead.hasNext()) {
-          mEvictionHead = mMap.values().iterator();
+          return;
         }
         Entry candidate = mEvictionHead.next();
         if (candidate == null) {
-          return evictionCount; // cache is empty, nothing to evict
+          return; // cache is empty, nothing to evict
         }
         if (candidate.mReferenced) {
           candidate.mReferenced = false;
           continue;
         }
+        if (dirtyOnly && !candidate.mDirty) {
+          continue;
+        }
         mEvictionCandidates.add(candidate);
       }
+    }
+
+    /**
+     * Attempts to evict all entries in mEvictionCandidates.
+     *
+     * @return the number of candidates actually evicted
+     */
+    private int evictBatch() {
+      int evicted = 0;
       if (mEvictionCandidates.isEmpty()) {
-        return 0;
+        return evicted;
       }
       flushEntries(mEvictionCandidates);
-      for (Entry candidate : mEvictionCandidates) {
-        if (null == mMap.computeIfPresent(candidate.mKey, (key, entry) -> {
-          if (entry.mDirty) {
-            return entry; // entry must have been written since we evicted.
-          }
-          onCacheRemove(candidate.mKey);
-          return null;
-        })) {
-          evictionCount++;
+      for (Entry entry : mEvictionCandidates) {
+        if (evictIfClean(entry)) {
+          evicted++;
         }
       }
-      return evictionCount;
+      mEvictionCandidates.clear();
+      return evicted;
+    }
+
+    private boolean evictIfClean(Entry entry) {
+      return null == mMap.computeIfPresent(entry.mKey, (key, e) -> {
+        if (entry.mDirty) {
+          return entry; // entry must have been written since we evicted.
+        }
+        onCacheRemove(entry.mKey);
+        return null;
+      });
     }
   }
 
@@ -407,6 +458,8 @@ public abstract class Cache<K, V> implements Closeable {
    *
    * The subclass is responsible for setting each candidate's mDirty field to false on success.
    *
+   * If the candidates are not dirty, they do not need to be flushed.
+   *
    * @param candidates the candidate entries to flush
    */
   protected abstract void flushEntries(List<Entry> candidates);
@@ -425,7 +478,6 @@ public abstract class Cache<K, V> implements Closeable {
     // Whether the entry has been recently accessed. Accesses set the bit to true, while the
     // eviction thread sets it to false. This is the same as the "referenced" bit described in the
     // CLOCK algorithm.
-
     private volatile boolean mReferenced = true;
 
     private Entry(K key, V value) {

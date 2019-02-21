@@ -41,6 +41,7 @@ import alluxio.master.CoreMaster;
 import alluxio.master.CoreMasterContext;
 import alluxio.master.block.meta.MasterWorkerInfo;
 import alluxio.master.journal.JournalContext;
+import alluxio.master.journal.JournalUtils;
 import alluxio.master.metastore.BlockStore;
 import alluxio.master.metastore.BlockStore.Block;
 import alluxio.master.metastore.BlockStore.BlockStoreArgs;
@@ -75,6 +76,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.UnknownHostException;
 import java.time.Clock;
 import java.util.ArrayList;
@@ -254,6 +257,11 @@ public final class DefaultBlockMaster extends CoreMaster implements BlockMaster 
   }
 
   @Override
+  public String getName() {
+    return Constants.BLOCK_MASTER_NAME;
+  }
+
+  @Override
   public Map<ServiceType, GrpcService> getServices() {
     Map<ServiceType, GrpcService> services = new HashMap<>();
     services.put(ServiceType.BLOCK_MASTER_CLIENT_SERVICE,
@@ -264,12 +272,7 @@ public final class DefaultBlockMaster extends CoreMaster implements BlockMaster 
   }
 
   @Override
-  public String getName() {
-    return Constants.BLOCK_MASTER_NAME;
-  }
-
-  @Override
-  public void processJournalEntry(JournalEntry entry) throws IOException {
+  public boolean processJournalEntry(JournalEntry entry) {
     // TODO(gene): A better way to process entries besides a huge switch?
     if (entry.hasBlockContainerIdGenerator()) {
       mJournaledNextContainerId = (entry.getBlockContainerIdGenerator()).getNextContainerId();
@@ -285,14 +288,15 @@ public final class DefaultBlockMaster extends CoreMaster implements BlockMaster 
         if (oldLen != Constants.UNKNOWN_SIZE) {
           LOG.warn("Attempting to update block length ({}) to a different length ({}).", oldLen,
               length);
-          return;
+          return true;
         }
       }
       mBlockStore.putBlock(blockInfoEntry.getBlockId(),
           BlockMeta.newBuilder().setLength(blockInfoEntry.getLength()).build());
     } else {
-      throw new IOException(ExceptionMessage.UNEXPECTED_JOURNAL_ENTRY.getMessage(entry));
+      return false;
     }
+    return true;
   }
 
   @Override

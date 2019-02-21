@@ -12,8 +12,8 @@
 package alluxio.master.journal.noop;
 
 import alluxio.master.journal.Journal;
-import alluxio.master.journal.JournalEntryStateMachine;
 import alluxio.master.journal.JournalSystem;
+import alluxio.master.journal.Journaled;
 
 import java.io.IOException;
 
@@ -27,7 +27,7 @@ public final class NoopJournalSystem implements JournalSystem {
   public NoopJournalSystem() {}
 
   @Override
-  public Journal createJournal(JournalEntryStateMachine master) {
+  public Journal createJournal(Journaled master) {
     return new NoopJournal();
   }
 
@@ -42,7 +42,7 @@ public final class NoopJournalSystem implements JournalSystem {
   }
 
   @Override
-  public boolean isFormatted() throws IOException {
+  public boolean isFormatted() {
     return true;
   }
 
@@ -52,11 +52,11 @@ public final class NoopJournalSystem implements JournalSystem {
   }
 
   @Override
-  public void format() throws IOException {}
+  public void format() {}
 
   @Override
-  public void start() throws InterruptedException, IOException {}
+  public void start() {}
 
   @Override
-  public void stop() throws InterruptedException, IOException {}
+  public void stop() {}
 }

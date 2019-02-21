@@ -11,10 +11,10 @@
 
 package alluxio.master.metrics;
 
-import alluxio.conf.ServerConfiguration;
 import alluxio.Constants;
-import alluxio.conf.PropertyKey;
 import alluxio.clock.SystemClock;
+import alluxio.conf.PropertyKey;
+import alluxio.conf.ServerConfiguration;
 import alluxio.grpc.GrpcService;
 import alluxio.grpc.ServiceType;
 import alluxio.heartbeat.HeartbeatContext;
@@ -22,6 +22,7 @@ import alluxio.heartbeat.HeartbeatExecutor;
 import alluxio.heartbeat.HeartbeatThread;
 import alluxio.master.CoreMaster;
 import alluxio.master.CoreMasterContext;
+import alluxio.master.journal.NoopJournaled;
 import alluxio.metrics.ClientMetrics;
 import alluxio.metrics.Metric;
 import alluxio.metrics.MetricsAggregator;
@@ -53,7 +54,7 @@ import java.util.Set;
 /**
  * Default implementation of the metrics master.
  */
-public class DefaultMetricsMaster extends CoreMaster implements MetricsMaster {
+public class DefaultMetricsMaster extends CoreMaster implements MetricsMaster, NoopJournaled {
   private final Map<String, MetricsAggregator> mMetricsAggregatorRegistry = new HashMap<>();
   private final Set<MultiValueMetricsAggregator> mMultiValueMetricsAggregatorRegistry =
       new HashSet<>();
@@ -171,16 +172,6 @@ public class DefaultMetricsMaster extends CoreMaster implements MetricsMaster {
   @Override
   public String getName() {
     return Constants.METRICS_MASTER_NAME;
-  }
-
-  @Override
-  public void processJournalEntry(JournalEntry entry) throws IOException {
-    // Do nothing, for now the metrics master is state-less
-  }
-
-  @Override
-  public void resetState() {
-    mMetricsStore.clear();
   }
 
   @Override
