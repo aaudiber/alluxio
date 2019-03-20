@@ -486,7 +486,6 @@ public final class ConfigurationUtils {
               .getConfigsList();
     } catch (io.grpc.StatusRuntimeException e) {
       AlluxioStatusException ase = AlluxioStatusException.fromStatusRuntimeException(e);
-      LOG.warn("Failed to handshake with master {} : {}", address, ase.getMessage());
       throw new UnavailableException(String.format(
           "Failed to handshake with master %s to load cluster default configuration values",
           address), e);
