@@ -260,6 +260,8 @@ public final class DefaultMetaMaster extends CoreMaster implements MetaMaster, N
         : ServerConfiguration.get(PropertyKey.MASTER_BACKUP_DIRECTORY);
     UnderFileSystem ufs = mUfs;
     if (options.getLocalFileSystem() && !ufs.getUnderFSType().equals("local")) {
+      // Only create a new UFS instance if the user requests a local filesystem backup *and* the
+      // root ufs (mUfs) isn't already local filesystem.
       ufs = UnderFileSystem.Factory.create("/", UnderFileSystemConfiguration.defaults());
       LOG.info("Backing up to local filesystem in directory {}", dir);
     } else {
