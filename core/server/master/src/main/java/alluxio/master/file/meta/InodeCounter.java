@@ -9,49 +9,40 @@
  * See the NOTICE file distributed with this work for information regarding copyright ownership.
  */
 
-package alluxio.master.journal;
+package alluxio.master.file.meta;
 
 import alluxio.master.journal.checkpoint.CheckpointInputStream;
 import alluxio.master.journal.checkpoint.CheckpointName;
 import alluxio.master.journal.checkpoint.CheckpointOutputStream;
 import alluxio.master.journal.checkpoint.CheckpointType;
-import alluxio.proto.journal.Journal.JournalEntry;
+import alluxio.master.journal.checkpoint.Checkpointed;
+
+import com.google.common.base.Preconditions;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.Collections;
-import java.util.Iterator;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Interface providing default implementations which do nothing.
+ * A checkpointed atomic long.
  */
-public interface NoopJournaled extends Journaled {
+public final class InodeCounter extends AtomicLong implements Checkpointed {
   @Override
-  default boolean processJournalEntry(JournalEntry entry) {
-    return false;
+  public CheckpointName getCheckpointName() {
+    return CheckpointName.INODE_COUNTER;
   }
 
   @Override
-  default void resetState() {
+  public void writeToCheckpoint(OutputStream output) throws IOException, InterruptedException {
+    CheckpointOutputStream stream = new CheckpointOutputStream(output, CheckpointType.LONG);
+    stream.writeLong(get());
+    stream.flush();
   }
 
   @Override
-  default CheckpointName getCheckpointName() {
-    return CheckpointName.NOOP;
-  }
-
-  @Override
-  default void writeToCheckpoint(OutputStream output) throws IOException {
-    // Just write a checkpoint type with no data.
-    new CheckpointOutputStream(output, CheckpointType.JOURNAL_ENTRY);
-  }
-
-  @Override
-  default void restoreFromCheckpoint(CheckpointInputStream input) {
-  }
-
-  @Override
-  default Iterator<JournalEntry> getJournalEntryIterator() {
-    return Collections.emptyIterator();
+  public void restoreFromCheckpoint(CheckpointInputStream input) throws IOException {
+    Preconditions.checkState(input.getType() == CheckpointType.LONG,
+        "Unexpected checkpoint type: %s", input.getType());
+    set(input.readLong());
   }
 }
