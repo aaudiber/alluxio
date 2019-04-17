@@ -20,10 +20,14 @@ import alluxio.util.io.FileUtils;
 
 import com.google.common.base.Preconditions;
 import com.google.common.io.Closer;
+import org.rocksdb.BackupEngine;
+import org.rocksdb.BackupableDBOptions;
 import org.rocksdb.Checkpoint;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.DBOptions;
+import org.rocksdb.Env;
+import org.rocksdb.RestoreOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
@@ -197,11 +201,21 @@ public final class RocksStore implements Closeable {
   public synchronized void restoreFromCheckpoint(CheckpointInputStream input) throws IOException {
     LOG.info("Restoring rocksdb from checkpoint");
     long startNano = System.nanoTime();
-    Preconditions.checkState(input.getType() == CheckpointType.ROCKS,
-        "Unexpected checkpoint type in RocksStore: " + input.getType());
     stopDb();
     FileUtils.deletePathRecursively(mDbPath);
-    TarUtils.readTarGz(Paths.get(mDbPath), input);
+    if (input.getType() == CheckpointType.ROCKS) {
+      FileUtils.deletePathRecursively(mDbCheckpointPath);
+      TarUtils.readTarGz(Paths.get(mDbCheckpointPath), input);
+      try (BackupEngine backupEngine = BackupEngine.open(Env.getDefault(),
+          new BackupableDBOptions(mDbCheckpointPath).setMaxBackgroundOperations(4))) {
+        backupEngine.restoreDbFromLatestBackup(mDbPath, mDbPath, new RestoreOptions(false));
+      } catch (RocksDBException e) {
+        throw new IOException(String.format("Failed to restore %s from backup %s: %s", mDbPath,
+            mDbCheckpointPath, e.toString()), e);
+      }
+    } else {
+      TarUtils.readTarGz(Paths.get(mDbPath), input);
+    }
     try {
       createDb();
     } catch (RocksDBException e) {
